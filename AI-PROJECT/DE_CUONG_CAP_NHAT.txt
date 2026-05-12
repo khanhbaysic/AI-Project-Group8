@@ -1,0 +1,150 @@
+# ĐỀ CƯƠNG DỰ ÁN AI — NHÓM 8
+# HỆ THỐNG GIÁM THỊ ẢO (E-PROCTORING) DỰA TRÊN PHÂN TÍCH HÀNH VI KHUÔN MẶT
+
+---
+
+## 1. Chủ đề (Topic)
+
+Xây dựng hệ thống giám thị ảo (E-Proctoring) hỗ trợ giám sát học sinh/sinh viên trong giờ học trực tuyến bằng cách **phân tích hành vi khuôn mặt** (Facial Behavior Analysis) để phát hiện các dấu hiệu mất tập trung, làm việc riêng hoặc gian lận.
+
+---
+
+## 2. Bài toán (Problem Statement)
+
+### Thách thức
+Trong môi trường học trực tuyến, giảng viên không thể trực tiếp quan sát sinh viên. Các hành vi làm việc riêng phổ biến gồm:
+- Nhìn sang ngang hoặc ra ngoài màn hình
+- Cúi đầu xuống sử dụng điện thoại
+- Ngủ gật trong giờ học
+- Nói chuyện riêng với người khác
+- Rời khỏi vị trí (không có mặt trước camera)
+- Có người khác thay thế ngồi trước camera
+
+### Mục tiêu
+Tạo ra hệ thống có khả năng:
+- Phân tích real-time hành vi khuôn mặt qua webcam
+- Tự động phát hiện và phân loại các dấu hiệu làm việc riêng
+- Lưu lại bằng chứng (ảnh chụp) khi phát hiện vi phạm
+- Chạy mượt mà trên máy tính cá nhân thông thường (không cần GPU)
+
+---
+
+## 3. Inputs (Đầu vào)
+
+- **Luồng video liên tục** từ webcam của sinh viên trong suốt buổi học
+- **File cấu hình** ngưỡng cảnh báo (có thể tùy chỉnh theo từng buổi học)
+
+---
+
+## 4. Outputs (Đầu ra)
+
+- **Màn hình real-time:** Bounding box khuôn mặt + nhãn trạng thái (OK / DISTRACTED / SLEEPING / TALKING / ABSENT)
+- **Dashboard chỉ số:** Yaw, Pitch, EAR, MAR hiển thị trực tiếp
+- **Ảnh bằng chứng:** Tự động chụp và lưu khi phát hiện vi phạm
+- **File log CSV:** Ghi lại toàn bộ lịch sử vi phạm (thời gian, loại vi phạm, đường dẫn ảnh)
+
+---
+
+## 5. Phương pháp & Mô hình đề xuất (Proposed Methods)
+
+### A. Phát hiện khuôn mặt (Face Detection)
+- **Haar Cascade** (OpenCV có sẵn) để xác định bounding box — nhẹ, nhanh
+- **MediaPipe FaceMesh** để trích xuất 468 điểm landmarks chính xác
+
+### B. Ước tính góc đầu (Head Pose Estimation)
+Dùng `cv2.solvePnP()` kết hợp 6 điểm landmarks chuẩn để tính 3 góc:
+- **Yaw** (ngang): > 30° → nhìn sang ngang → mất tập trung
+- **Pitch** (dọc): < -25° → cúi xuống → đang dùng điện thoại
+- **Roll**: nghiêng đầu
+
+### C. Phát hiện ngủ gật (Eye Aspect Ratio — EAR)
+```
+EAR = (||P2-P6|| + ||P3-P5||) / (2 × ||P1-P4||)
+```
+- EAR < 0.22 liên tục ≥ 3 giây → ngủ gật
+
+### D. Phát hiện nói chuyện (Mouth Aspect Ratio — MAR)
+```
+MAR = (||A|| + ||B||) / (2 × ||C||)
+```
+- MAR > 0.6 liên tục ≥ 2 giây → đang nói chuyện
+
+### E. Phát hiện bất thường khác
+- **Không có mặt** ≥ 3 giây → cảnh báo rời khỏi vị trí
+- **Nhiều hơn 1 khuôn mặt** trong frame → có người khác hỗ trợ
+
+---
+
+## 6. Kiến trúc hệ thống
+
+```
+Webcam
+  ↓
+Face Detection (Haar Cascade + MediaPipe FaceMesh)
+  ↓
+┌──────────────────────────────────────────┐
+│           Phân tích song song            │
+│  ┌────────────┐  ┌──────┐  ┌─────────┐  │
+│  │ Head Pose  │  │ EAR  │  │   MAR   │  │
+│  │(Yaw/Pitch) │  │(Mắt) │  │(Miệng)  │  │
+│  └────────────┘  └──────┘  └─────────┘  │
+└──────────────────────────────────────────┘
+  ↓
+Alert System
+  ↓
+Dashboard + Lưu bằng chứng + Ghi log CSV
+```
+
+---
+
+## 7. Stack công nghệ
+
+| Thành phần         | Thư viện / Công cụ                    |
+|--------------------|---------------------------------------|
+| Xử lý video        | OpenCV (cv2)                          |
+| Face Landmarks     | MediaPipe FaceMesh                    |
+| Head Pose          | cv2.solvePnP + cv2.RQDecomp3x3        |
+| EAR / MAR          | scipy.spatial.distance                |
+| Báo cáo            | LaTeX (Overleaf)                      |
+
+---
+
+## 8. Cấu trúc thư mục project
+
+```
+e-proctoring/
+├── src/
+│   ├── main.py              # Vòng lặp chính, hiển thị dashboard
+│   ├── face_detector.py     # Phát hiện khuôn mặt + landmarks
+│   ├── head_pose.py         # Ước tính góc Yaw/Pitch/Roll
+│   ├── eye_monitor.py       # Tính EAR, phát hiện ngủ gật
+│   ├── mouth_monitor.py     # Tính MAR, phát hiện nói chuyện
+│   └── alert_system.py      # Lưu bằng chứng + ghi log CSV
+├── evidence/                # Ảnh bằng chứng + violations.csv
+├── requirements.txt
+└── report/                  # Báo cáo LaTeX
+```
+
+---
+
+## 9. Kết quả dự kiến (Expected Outcomes)
+
+- Hệ thống giám thị hoàn chỉnh, giao diện trực quan, chạy real-time
+- Phát hiện được ≥ 5 loại hành vi làm việc riêng phổ biến
+- FPS ổn định ≥ 20 FPS trên máy tính thông thường (không GPU)
+- Độ trễ cảnh báo (Latency) < 500ms từ lúc phát hiện đến lúc hiển thị
+- Báo cáo kỹ thuật LaTeX hoàn chỉnh
+
+---
+
+## 10. Cách đánh giá (Evaluation Metrics)
+
+### Đánh giá độ chính xác
+- **Precision / Recall / F1-Score** cho từng loại hành vi
+- Ưu tiên tối ưu **Recall** (tránh bỏ lọt vi phạm)
+- **Confusion Matrix** cho toàn bộ hệ thống phân loại
+
+### Đánh giá hiệu năng
+- **FPS** — tốc độ xử lý khung hình thực tế
+- **Latency** — độ trễ từ frame đến cảnh báo
+- **CPU Usage** — đảm bảo chạy được trên máy thông thường
