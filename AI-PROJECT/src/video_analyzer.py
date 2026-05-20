@@ -80,6 +80,19 @@ def normalized_distance_to_bbox_center(point, bbox):
     return ((point[0] - cx) ** 2 + (point[1] - cy) ** 2) ** 0.5 / scale
 
 
+def frame_distance_ratio(point_a, point_b, width, height):
+    diagonal = max((width ** 2 + height ** 2) ** 0.5, 1.0)
+    return ((point_a[0] - point_b[0]) ** 2 + (point_a[1] - point_b[1]) ** 2) ** 0.5 / diagonal
+
+
+def near_recent_phone(bbox, phone_centers, width, height, max_ratio):
+    if not phone_centers:
+        return False
+    center = bbox_center(bbox)
+    nearest = min(frame_distance_ratio(center, phone_center, width, height) for phone_center in phone_centers)
+    return nearest <= max_ratio
+
+
 def assign_phones_to_people(person_bboxes, phone_detections):
     owners = set()
     for phone in phone_detections:
@@ -131,6 +144,8 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     detector = FaceDetector(
         max_num_faces=20,
         detection_scale=CONFIG.get("video_detection_scale", 1.0),
+        min_detection_confidence=CONFIG.get("video_face_min_detection_confidence", 0.5),
+        min_tracking_confidence=CONFIG.get("video_face_min_tracking_confidence", 0.5),
     )
     face_tracker = CentroidTracker(max_distance=max(width, height) * 0.08, max_missed=int(fps * 2))
     person_tracker = CentroidTracker(max_distance=max(width, height) * 0.12, max_missed=int(fps * 2))
@@ -156,6 +171,10 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     students: dict[int, StudentState] = {}
     distraction_started_at: dict[int, float] = {}
     phone_started_at: dict[int, float] = {}
+    phone_last_seen_at: dict[int, float] = {}
+    peer_distraction_started_at: dict[int, float] = {}
+    confirmed_phone_context_until = 0.0
+    confirmed_phone_centers = []
     detail_rows = []
 
     frame_idx = 0
@@ -169,7 +188,10 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
         detection = detector.detect(frame)
         if phone_detector.available and frame_idx % CONFIG.get("phone_interval_frames", 5) == 0:
             if CONFIG.get("person_tracking_enabled", True):
-                phone_detections, person_detections = phone_detector.detect_people_and_phones(frame)
+                phone_detections, person_detections = phone_detector.detect_people_and_phones(
+                    frame,
+                    track_people=CONFIG.get("person_tracker_backend", "centroid") == "yolo",
+                )
                 person_detections = filter_people(
                     person_detections,
                     width,
@@ -180,6 +202,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                 phone_detections = phone_detector.detect(frame)
                 person_detections = []
 
+        active_phone_users = 0
+        active_phone_centers = []
+
         use_person_tracking = (
             CONFIG.get("person_tracking_enabled", True)
             and phone_detector.available
@@ -189,7 +214,19 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
         if use_person_tracking:
             person_bboxes = [person.bbox for person in person_detections]
             phone_owner_indices = assign_phones_to_people(person_bboxes, phone_detections)
-            assignments, tracks = person_tracker.update(person_bboxes)
+            use_yolo_track_ids = (
+                CONFIG.get("person_tracker_backend", "centroid") == "yolo"
+                and any(person.track_id is not None for person in person_detections)
+            )
+            if use_yolo_track_ids:
+                assignments = {
+                    det_idx: person.track_id
+                    for det_idx, person in enumerate(person_detections)
+                    if person.track_id is not None
+                }
+                tracks = {}
+            else:
+                assignments, tracks = person_tracker.update(person_bboxes)
             matched_track_ids = set(assignments.values())
             used_face_indices = set()
 
@@ -203,10 +240,18 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                 raw_phone_detected = det_idx in phone_owner_indices
                 if raw_phone_detected:
                     phone_started_at.setdefault(track_id, timestamp)
-                    phone_detected = timestamp - phone_started_at[track_id] >= CONFIG.get("video_phone_duration", 0.0)
+                    phone_last_seen_at[track_id] = timestamp
                 else:
-                    phone_started_at.pop(track_id, None)
-                    phone_detected = False
+                    last_seen = phone_last_seen_at.get(track_id)
+                    if last_seen is None or timestamp - last_seen > CONFIG.get("video_phone_hold_seconds", 0.0):
+                        phone_started_at.pop(track_id, None)
+                        phone_last_seen_at.pop(track_id, None)
+
+                phone_detected = (
+                    track_id in phone_started_at
+                    and timestamp - phone_started_at[track_id] >= CONFIG.get("video_phone_duration", 0.0)
+                    and timestamp - phone_last_seen_at.get(track_id, timestamp) <= CONFIG.get("video_phone_hold_seconds", 0.0)
+                )
 
                 if face_idx is not None:
                     used_face_indices.add(face_idx)
@@ -230,6 +275,35 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
 
                 if phone_detected:
                     state = "PHONE_USAGE"
+                    active_phone_users += 1
+                    active_phone_centers.append(bbox_center(bbox))
+                    confirmed_phone_context_until = timestamp + CONFIG.get("video_phone_context_seconds", 2.5)
+                    peer_distraction_started_at.pop(track_id, None)
+                elif CONFIG.get("video_peer_distraction_enabled", True) and timestamp <= confirmed_phone_context_until:
+                    peer_candidate = False
+                    if face_idx is not None and abs(yaw) >= CONFIG.get("video_peer_yaw_threshold", 35.0):
+                        peer_candidate = True
+                    elif (
+                        state == "BODY_ONLY"
+                        and CONFIG.get("video_peer_body_only_enabled", True)
+                        and near_recent_phone(
+                            bbox,
+                            confirmed_phone_centers,
+                            width,
+                            height,
+                            CONFIG.get("video_peer_body_distance_ratio", 0.45),
+                        )
+                    ):
+                        peer_candidate = True
+
+                    if peer_candidate:
+                        peer_distraction_started_at.setdefault(track_id, timestamp)
+                        if timestamp - peer_distraction_started_at[track_id] >= CONFIG.get("video_peer_distraction_duration", 0.35):
+                            state = "DISTRACTED"
+                    else:
+                        peer_distraction_started_at.pop(track_id, None)
+                else:
+                    peer_distraction_started_at.pop(track_id, None)
 
                 record = {
                     "timestamp": timestamp,
@@ -283,12 +357,34 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                 )
                 if raw_phone_detected:
                     phone_started_at.setdefault(track_id, timestamp)
-                    phone_detected = timestamp - phone_started_at[track_id] >= CONFIG.get("video_phone_duration", 0.0)
+                    phone_last_seen_at[track_id] = timestamp
                 else:
-                    phone_started_at.pop(track_id, None)
-                    phone_detected = False
+                    last_seen = phone_last_seen_at.get(track_id)
+                    if last_seen is None or timestamp - last_seen > CONFIG.get("video_phone_hold_seconds", 0.0):
+                        phone_started_at.pop(track_id, None)
+                        phone_last_seen_at.pop(track_id, None)
+
+                phone_detected = (
+                    track_id in phone_started_at
+                    and timestamp - phone_started_at[track_id] >= CONFIG.get("video_phone_duration", 0.0)
+                    and timestamp - phone_last_seen_at.get(track_id, timestamp) <= CONFIG.get("video_phone_hold_seconds", 0.0)
+                )
                 if phone_detected:
                     state = "PHONE_USAGE"
+                    active_phone_users += 1
+                    active_phone_centers.append(bbox_center(bbox))
+                    confirmed_phone_context_until = timestamp + CONFIG.get("video_phone_context_seconds", 2.5)
+                    peer_distraction_started_at.pop(track_id, None)
+                elif CONFIG.get("video_peer_distraction_enabled", True) and timestamp <= confirmed_phone_context_until:
+                    peer_candidate = abs(yaw) >= CONFIG.get("video_peer_yaw_threshold", 35.0)
+                    if peer_candidate:
+                        peer_distraction_started_at.setdefault(track_id, timestamp)
+                        if timestamp - peer_distraction_started_at[track_id] >= CONFIG.get("video_peer_distraction_duration", 0.35):
+                            state = "DISTRACTED"
+                    else:
+                        peer_distraction_started_at.pop(track_id, None)
+                else:
+                    peer_distraction_started_at.pop(track_id, None)
 
                 record = {
                     "timestamp": timestamp,
@@ -312,6 +408,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                 cv2.putText(frame, f"{label} {state} {score:.1f}", (x, max(20, y - 8)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        if active_phone_centers:
+            confirmed_phone_centers = active_phone_centers
 
         for phone in phone_detections:
             x, y, w, h = phone.bbox
@@ -341,7 +440,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
             detail_rows.append(record.copy())
 
         visible_label = "Persons" if use_person_tracking else "Faces"
-        cv2.putText(frame, f"Time: {timestamp:.1f}s | {visible_label}: {len(assignments)} | Tracked: {len(students)} | Phones: {len(phone_detections)}",
+        cv2.putText(frame, f"Time: {timestamp:.1f}s | {visible_label}: {len(assignments)} | IDs: {len(students)} | Raw Phones: {len(phone_detections)} | Active Phone Users: {active_phone_users}",
                     (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 220, 255), 2)
         writer.write(frame)
         if show:

@@ -11,6 +11,7 @@ class PhoneDetection:
 class PersonDetection:
     bbox: tuple[int, int, int, int]
     confidence: float
+    track_id: int | None = None
 
 
 class PhoneDetector:
@@ -52,18 +53,59 @@ class PhoneDetector:
         phones, _ = self.detect_people_and_phones(frame)
         return phones
 
-    def detect_people_and_phones(self, frame):
+    def detect_people_and_phones(self, frame, track_people=False):
         if not self.available:
             return [], []
 
         try:
-            results = self.model.predict(frame, conf=self.confidence, verbose=False)
+            if track_people:
+                person_results = self.model.track(
+                    frame,
+                    conf=self.confidence,
+                    verbose=False,
+                    persist=True,
+                    classes=[0],
+                )
+                phone_results = self.model.predict(
+                    frame,
+                    conf=self.confidence,
+                    verbose=False,
+                    classes=[67],
+                )
+            else:
+                results = self.model.predict(frame, conf=self.confidence, verbose=False)
         except Exception as exc:
             self.warning = f"Phone detection failed: {exc}"
             return [], []
 
         phones = []
         people = []
+
+        if track_people:
+            for result in person_results:
+                names = result.names
+                for box in result.boxes:
+                    cls_id = int(box.cls[0])
+                    label = str(names.get(cls_id, "")).lower()
+                    if label != "person":
+                        continue
+                    x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+                    track_id = None
+                    if getattr(box, "id", None) is not None:
+                        track_id = int(box.id[0])
+                    people.append(PersonDetection((x1, y1, x2 - x1, y2 - y1), float(box.conf[0]), track_id))
+
+            for result in phone_results:
+                names = result.names
+                for box in result.boxes:
+                    cls_id = int(box.cls[0])
+                    label = str(names.get(cls_id, "")).lower()
+                    if label not in {"cell phone", "mobile phone", "phone"}:
+                        continue
+                    x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+                    phones.append(PhoneDetection((x1, y1, x2 - x1, y2 - y1), float(box.conf[0])))
+            return phones, people
+
         for result in results:
             names = result.names
             for box in result.boxes:
