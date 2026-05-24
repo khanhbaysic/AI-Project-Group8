@@ -2,7 +2,7 @@ import time
 
 import cv2
 
-from src.alert_system import AlertSystem
+from src.alert_system_v2 import AlertSystem
 from src.behavior_analyzer.attention_score import AttentionScorer
 from src.behavior_analyzer.decision_engine import DecisionEngine
 from src.behavior_analyzer.pattern_detector import PatternDetector
@@ -63,7 +63,7 @@ def run():
     buffer = TemporalBuffer(CONFIG["buffer_seconds"])
     pattern_detector = PatternDetector()
     decision_engine = DecisionEngine()
-    alert_system = AlertSystem(CONFIG["violations_csv"], CONFIG["evidence_images_dir"])
+    alert_system = AlertSystem(CONFIG["violations_csv"], CONFIG["evidence_images_dir"], privacy_mode=True)
     dashboard = Dashboard()
 
     identity_load_status = "NOT_LOADED"
