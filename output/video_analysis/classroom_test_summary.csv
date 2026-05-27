@@ -1,0 +1,5 @@
+student,total_seconds,final_attention_score,ok_seconds,distracted_seconds,sleeping_seconds,talking_seconds,phone_usage_seconds,body_only_seconds,absent_seconds,pattern_alerts
+Student_1,15.13,54.33,0.0,0.0,0.0,0.0,8.92,4.54,1.67,Rapid Attention Drop:1
+Student_2,13.46,85.67,7.79,0.0,0.0,0.0,0.0,3.04,2.62,
+Student_3,15.12,92.5,0.0,0.0,0.0,0.0,0.0,13.87,1.25,
+Student_4,4.71,85.67,0.0,0.0,0.0,0.0,0.0,2.08,2.62,

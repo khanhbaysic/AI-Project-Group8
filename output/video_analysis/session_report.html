@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bao cao phien giam sat - Privacy First</title>
+<style>
+  :root { --bg:#0b1220; --panel:#0f1a2e; --line:#1e293b; --ink:#e2e8f0;
+           --mut:#94a3b8; --accent:#38bdf8; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink);
+          font-family:"Segoe UI",system-ui,sans-serif; line-height:1.55;
+          padding:32px 18px 64px; }
+  .wrap { max-width:1040px; margin:0 auto; }
+  .badge { display:inline-flex; align-items:center; gap:8px;
+            background:rgba(56,189,248,.12); color:var(--accent);
+            border:1px solid rgba(56,189,248,.35); padding:6px 12px;
+            border-radius:999px; font-size:12px; font-weight:600;
+            letter-spacing:.04em; text-transform:uppercase; }
+  h1 { font-size:30px; margin:14px 0 4px; letter-spacing:-.02em; }
+  .sub { color:var(--mut); font-size:14px; }
+  .meta { display:flex; gap:24px; flex-wrap:wrap; margin:22px 0 8px; }
+  .meta div { background:var(--panel); border:1px solid var(--line);
+               border-radius:12px; padding:12px 16px; min-width:120px; }
+  .meta b { display:block; font-size:24px; color:#fff; }
+  .meta span { font-size:12px; color:var(--mut); }
+  section { margin-top:38px; }
+  h2 { font-size:18px; margin-bottom:14px; display:flex; align-items:center;
+        gap:10px; }
+  h2::before { content:""; width:4px; height:18px; background:var(--accent);
+                border-radius:2px; }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin:6px 0 16px;
+             font-size:12px; color:var(--mut); }
+  .lg { display:inline-flex; align-items:center; gap:6px; }
+  .lg i { width:13px; height:13px; border-radius:3px; display:inline-block; }
+  .hm { background:var(--panel); border:1px solid var(--line);
+         border-radius:14px; padding:16px; overflow-x:auto; }
+  .hm-row { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .hm-label { width:120px; flex:none; font-size:13px; display:flex;
+               justify-content:space-between; padding-right:8px; }
+  .hm-score { color:var(--accent); font-weight:700; }
+  .hm-track { display:grid; gap:2px; flex:1;
+               grid-template-columns:repeat(60,1fr); }
+  .cell { height:22px; border-radius:2px; transition:transform .1s; }
+  .cell:hover { transform:scaleY(1.25); outline:1px solid #fff; }
+  .png-wrap { margin-top:16px; }
+  .png-wrap img { width:100%; border-radius:14px; border:1px solid var(--line); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+           gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line);
+           border-radius:16px; padding:18px; }
+  .card-head { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .card h3 { font-size:16px; }
+  .card p { font-size:12px; color:var(--mut); }
+  .ring { --p:0; width:62px; height:62px; flex:none; border-radius:50%;
+           display:grid; place-items:center; font-weight:800; font-size:18px;
+           color:#fff;
+           background:conic-gradient(var(--c) calc(var(--p)*1%),
+                      #1e293b 0); }
+  .ring span { width:46px; height:46px; border-radius:50%; background:var(--panel);
+                display:grid; place-items:center; }
+  .bar { display:grid; grid-template-columns:96px 1fr 38px; align-items:center;
+          gap:8px; font-size:11px; color:var(--mut); margin-bottom:5px; }
+  .bar-track { background:#1e293b; border-radius:99px; height:8px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:99px; }
+  .bar b { color:var(--ink); text-align:right; }
+  .flags { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+  .flag { background:rgba(245,158,11,.14); color:#fbbf24;
+           border:1px solid rgba(245,158,11,.3); border-radius:8px;
+           padding:3px 9px; font-size:11px; }
+  .flag.phone { background:rgba(239,68,68,.14); color:#f87171;
+                 border-color:rgba(239,68,68,.3); }
+  .note { margin-top:40px; background:rgba(34,197,94,.07);
+           border:1px solid rgba(34,197,94,.25); border-radius:14px;
+           padding:18px 20px; font-size:13px; color:#bbf7d0; }
+  .note b { color:#86efac; }
+  footer { margin-top:36px; text-align:center; color:#475569; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">&#128274; Privacy-First &middot; Khong luu anh khuon mat</span>
+  <h1>Bao cao phien giam sat lop hoc</h1>
+  <p class="sub">Nguon du lieu: classroom_test_details.csv &middot; Tao luc 24/05/2026 22:47</p>
+
+  <div class="meta">
+    <div><b>4</b><span>Sinh vien duoc theo doi</span></div>
+    <div><b>15s</b><span>Thoi luong phan tich</span></div>
+    <div><b>0</b><span>Anh khuon mat luu tru</span></div>
+  </div>
+
+  <section>
+    <h2>Heatmap chu y ca lop theo thoi gian</h2>
+    <div class="legend"><span class="lg"><i style="background:#22c55e"></i>Tap trung</span><span class="lg"><i style="background:#94a3b8"></i>Khong ro mat</span><span class="lg"><i style="background:#f59e0b"></i>Mat tap trung</span><span class="lg"><i style="background:#a855f7"></i>Noi chuyen</span><span class="lg"><i style="background:#ef4444"></i>Dung dien thoai</span><span class="lg"><i style="background:#3b82f6"></i>Ngu gat</span><span class="lg"><i style="background:#1e293b"></i>Vang mat</span></div>
+    <div class="hm">
+      <div class="hm-row"><div class="hm-label">Student_1<span class="hm-score">54</span></div><div class="hm-track"><div class="cell" style="background:#94a3b8" title="Student_1 | 0.1s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 0.4s | Khong ro mat"></div><div class="cell" style="background:#ef4444" title="Student_1 | 0.6s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 0.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 1.1s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 1.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 1.6s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 1.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 2.1s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 2.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 2.6s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 2.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 3.1s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 3.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 3.6s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 3.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 4.1s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 4.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 4.7s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 4.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 5.2s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 5.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 5.7s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 5.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 6.2s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 6.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 6.7s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 6.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 7.2s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 7.4s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 7.7s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 7.9s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 8.2s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 8.4s | Dung dien thoai"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 8.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 8.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 9.2s | Khong ro mat"></div><div class="cell" style="background:#ef4444" title="Student_1 | 9.4s | Dung dien thoai"></div><div class="cell" style="background:#1e293b" title="Student_1 | 9.7s | Vang mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 9.9s | Khong ro mat"></div><div class="cell" style="background:#1e293b" title="Student_1 | 10.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_1 | 10.4s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_1 | 10.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_1 | 10.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_1 | 11.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_1 | 11.4s | Vang mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 11.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 11.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 12.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 12.4s | Khong ro mat"></div><div class="cell" style="background:#ef4444" title="Student_1 | 12.7s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="Student_1 | 12.9s | Dung dien thoai"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 13.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 13.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 13.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 14.0s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 14.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 14.5s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 14.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_1 | 15.0s | Khong ro mat"></div></div></div>
+<div class="hm-row"><div class="hm-label">Student_2<span class="hm-score">86</span></div><div class="hm-track"><div class="cell" style="background:#22c55e" title="Student_2 | 0.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 0.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 0.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 0.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 1.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 1.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 1.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 1.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 2.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 2.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 2.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 2.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 3.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 3.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 3.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 3.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 4.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 4.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 4.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 4.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 5.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 5.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 5.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 5.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 6.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 6.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 6.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 6.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 7.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 7.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="Student_2 | 7.7s | Tap trung"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 7.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 8.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 8.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 8.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 8.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 9.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 9.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 9.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 9.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 10.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_2 | 10.4s | Khong ro mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 10.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 10.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 11.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 11.4s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 11.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 11.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 12.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 12.4s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 12.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 12.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 13.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_2 | 13.4s | Vang mat"></div><div class="cell" style="background:#0b1220" title="Student_2 | 13.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_2 | 14.0s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_2 | 14.2s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_2 | 14.5s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_2 | 14.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_2 | 15.0s | khong co du lieu"></div></div></div>
+<div class="hm-row"><div class="hm-label">Student_3<span class="hm-score">93</span></div><div class="hm-track"><div class="cell" style="background:#94a3b8" title="Student_3 | 0.1s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 0.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 0.6s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 0.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 1.1s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 1.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 1.6s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 1.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 2.1s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 2.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 2.6s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 2.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 3.1s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 3.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 3.6s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 3.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 4.1s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 4.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 4.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 4.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 5.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 5.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 5.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 5.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 6.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 6.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 6.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 6.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 7.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 7.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 7.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 7.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 8.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 8.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 8.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 8.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 9.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 9.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 9.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 9.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 10.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 10.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 10.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 10.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 11.2s | Khong ro mat"></div><div class="cell" style="background:#1e293b" title="Student_3 | 11.4s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_3 | 11.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_3 | 11.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_3 | 12.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_3 | 12.4s | Vang mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 12.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 12.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 13.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 13.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 13.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 14.0s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 14.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 14.5s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 14.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_3 | 15.0s | Khong ro mat"></div></div></div>
+<div class="hm-row"><div class="hm-label">Student_4<span class="hm-score">86</span></div><div class="hm-track"><div class="cell" style="background:#0b1220" title="Student_4 | 0.1s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 0.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 0.6s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 0.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 1.1s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 1.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 1.6s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 1.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 2.1s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 2.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 2.6s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 2.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 3.1s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 3.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 3.6s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 3.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 4.1s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 4.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 4.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 4.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 5.2s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 5.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 5.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 5.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 6.2s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 6.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 6.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 6.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 7.2s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 7.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 7.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 7.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 8.2s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 8.4s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 8.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 8.9s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 9.2s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 9.4s | khong co du lieu"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 9.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 9.9s | Khong ro mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 10.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 10.4s | Vang mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 10.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 10.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 11.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 11.4s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 11.7s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 11.9s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 12.2s | Khong ro mat"></div><div class="cell" style="background:#94a3b8" title="Student_4 | 12.4s | Khong ro mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 12.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 12.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 13.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 13.4s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 13.7s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 14.0s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 14.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="Student_4 | 14.5s | Vang mat"></div><div class="cell" style="background:#0b1220" title="Student_4 | 14.7s | khong co du lieu"></div><div class="cell" style="background:#0b1220" title="Student_4 | 15.0s | khong co du lieu"></div></div></div>
+    </div>
+    <div class="png-wrap"><img src="class_attention_heatmap.png" alt="Heatmap chu y ca lop"></div>
+  </section>
+
+  <section>
+    <h2>Phan tich tung sinh vien</h2>
+    <div class="grid">
+      
+        <div class="card">
+          <div class="card-head">
+            <div class="ring" style="--c:#f59e0b;--p:54">
+              <span>54</span>
+            </div>
+            <div>
+              <h3>Student_1</h3>
+              <p>15.1s &middot; chu y TB 74
+                 &middot; tap trung 0%</p>
+            </div>
+          </div>
+          <div class="bars"><div class="bar"><span>Dung dien thoai</span><div class="bar-track"><div class="bar-fill" style="width:59%;background:#ef4444"></div></div><b>59%</b></div><div class="bar"><span>Khong ro mat</span><div class="bar-track"><div class="bar-fill" style="width:30%;background:#94a3b8"></div></div><b>30%</b></div><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:11%;background:#1e293b"></div></div><b>11%</b></div></div>
+          <div class="flags"><span class="flag">Rapid Attention Drop</span></div><div class="flags"><span class="flag phone">Phat hien dien thoai</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="ring" style="--c:#22c55e;--p:86">
+              <span>86</span>
+            </div>
+            <div>
+              <h3>Student_2</h3>
+              <p>13.4s &middot; chu y TB 99
+                 &middot; tap trung 58%</p>
+            </div>
+          </div>
+          <div class="bars"><div class="bar"><span>Tap trung</span><div class="bar-track"><div class="bar-fill" style="width:58%;background:#22c55e"></div></div><b>58%</b></div><div class="bar"><span>Khong ro mat</span><div class="bar-track"><div class="bar-fill" style="width:23%;background:#94a3b8"></div></div><b>23%</b></div><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:20%;background:#1e293b"></div></div><b>20%</b></div></div>
+          
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="ring" style="--c:#22c55e;--p:93">
+              <span>93</span>
+            </div>
+            <div>
+              <h3>Student_3</h3>
+              <p>15.1s &middot; chu y TB 98
+                 &middot; tap trung 0%</p>
+            </div>
+          </div>
+          <div class="bars"><div class="bar"><span>Khong ro mat</span><div class="bar-track"><div class="bar-fill" style="width:92%;background:#94a3b8"></div></div><b>92%</b></div><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:8%;background:#1e293b"></div></div><b>8%</b></div></div>
+          
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="ring" style="--c:#22c55e;--p:86">
+              <span>86</span>
+            </div>
+            <div>
+              <h3>Student_4</h3>
+              <p>4.7s &middot; chu y TB 95
+                 &middot; tap trung 0%</p>
+            </div>
+          </div>
+          <div class="bars"><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:56%;background:#1e293b"></div></div><b>56%</b></div><div class="bar"><span>Khong ro mat</span><div class="bar-track"><div class="bar-fill" style="width:44%;background:#94a3b8"></div></div><b>44%</b></div></div>
+          
+        </div>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>Nguyen tac Privacy-First:</b> Bao cao nay duoc tao hoan toan tu du lieu
+    hinh hoc (goc dau Yaw/Pitch, ti le mat EAR, ti le mieng MAR, trang thai
+    hanh vi). KHONG co khung hinh goc hay anh khuon mat nao duoc luu lam bang
+    chung. Giao vien van nam duoc ai mat tap trung vao luc nao, nhung danh tinh
+    truc quan cua sinh vien khong bi luu tru &mdash; giam thieu rui ro lo lot
+    du lieu sinh trac hoc.
+  </div>
+
+  <footer>E-Proctoring System &middot; Nhom 8 &middot; Module phan tich hau-buoi-hoc</footer>
+</div>
+</body>
+</html>
