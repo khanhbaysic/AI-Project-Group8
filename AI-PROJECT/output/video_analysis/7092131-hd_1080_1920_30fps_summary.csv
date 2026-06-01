@@ -1,0 +1,10 @@
+student,total_seconds,final_attention_score,ok_seconds,distracted_seconds,sleeping_seconds,talking_seconds,phone_usage_seconds,body_only_seconds,absent_seconds,pattern_alerts
+Student_1,3.94,82.85,0.63,0.23,0.0,0.0,0.0,0.0,3.07,
+Student_2,13.41,100.0,13.31,0.1,0.0,0.0,0.0,0.0,0.0,
+Student_3,11.44,63.53,0.33,7.34,0.0,0.0,0.0,0.0,3.77,Frequent Distraction:1; Rapid Attention Drop:1; Sustained Distraction:1
+Student_4,2.34,88.05,0.1,0.07,0.0,0.0,0.0,0.0,2.17,
+Student_5,2.3,89.32,0.33,0.0,0.0,0.0,0.0,0.0,1.97,
+Student_6,7.34,84.5,2.64,2.57,0.0,0.0,0.0,0.0,2.14,Frequent Distraction:1; Progressive Drowsiness:1
+Student_7,2.07,89.26,0.07,0.03,0.0,0.0,0.0,0.0,1.97,Progressive Drowsiness:1
+Student_8,2.17,89.09,0.07,0.13,0.0,0.0,0.0,0.0,1.97,
+Body_1,1.13,100.0,0.0,0.0,0.0,0.0,0.0,1.13,0.0,
