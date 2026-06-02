@@ -24,13 +24,19 @@ class FaceDetectionResult:
 
 
 class FaceDetector:
-    def __init__(self, max_num_faces=5, detection_scale=1.0):
+    def __init__(
+        self,
+        max_num_faces=5,
+        detection_scale=1.0,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    ):
         self.detection_scale = max(1.0, float(detection_scale))
         self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=max_num_faces,
             refine_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_detection_confidence=min_detection_confidence,
+            min_tracking_confidence=min_tracking_confidence,
         )
 
     def detect(self, frame) -> FaceDetectionResult:

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 **/venv/
 **/__pycache__/
 *.pyc
@@ -5,3 +6,11 @@
 **/evidence/
 *.mp4
 **/.vscode/
+=======
+AI-PROJECT/videos/
+AI-PROJECT/output/
+AI-PROJECT/evidence/
+AI-PROJECT/student_cards/
+AI-PROJECT/__pycache__/
+*.py[cod]
+>>>>>>> origin/main
