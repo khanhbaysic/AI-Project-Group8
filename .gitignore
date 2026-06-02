@@ -1,16 +1,31 @@
-<<<<<<< HEAD
-**/venv/
-**/__pycache__/
-*.pyc
-**/output/
-**/evidence/
-*.mp4
-**/.vscode/
-=======
-AI-PROJECT/videos/
-AI-PROJECT/output/
-AI-PROJECT/evidence/
-AI-PROJECT/student_cards/
-AI-PROJECT/__pycache__/
+# --- Python ---
+__pycache__/
 *.py[cod]
->>>>>>> origin/main
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- ML model weights (downloaded on first run, don't commit) ---
+*.pt
+*.onnx
+*.h5
+
+# --- Large media (datasets / test videos) ---
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# --- Generated outputs (regenerated every run) ---
+output/
+**/output/
+evidence/
+**/evidence/
+AI-PROJECT/videos/
