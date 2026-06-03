@@ -50,7 +50,12 @@ def run():
     face_detector = FaceDetector()
     head_pose = HeadPoseEstimator()
     eye_monitor = EyeMonitor(CONFIG["ear_threshold"], CONFIG["sleep_duration"])
-    mouth_monitor = MouthMonitor(CONFIG["mar_threshold"], CONFIG["talk_duration"])
+    mouth_monitor = MouthMonitor(
+        CONFIG["mar_threshold"], CONFIG["talk_duration"],
+        talk_window=CONFIG.get("talk_window", 1.5),
+        talk_min_transitions=CONFIG.get("talk_min_transitions", 3),
+        talk_mar_variance_threshold=CONFIG.get("talk_mar_variance_threshold", 0.005),
+    )
     state_classifier = StateClassifier(CONFIG["yaw_threshold"], CONFIG["pitch_down_threshold"])
     liveness_detector = LivenessDetector(
         CONFIG["liveness_threshold"],

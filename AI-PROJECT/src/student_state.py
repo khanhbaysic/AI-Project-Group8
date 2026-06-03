@@ -11,7 +11,12 @@ class StudentState:
     def __init__(self, student_label, config):
         self.student_label = student_label
         self.eye_monitor = EyeMonitor(config["ear_threshold"], config["sleep_duration"])
-        self.mouth_monitor = MouthMonitor(config["mar_threshold"], config["talk_duration"])
+        self.mouth_monitor = MouthMonitor(
+            config["mar_threshold"], config["talk_duration"],
+            talk_window=config.get("talk_window", 1.5),
+            talk_min_transitions=config.get("talk_min_transitions", 3),
+            talk_mar_variance_threshold=config.get("talk_mar_variance_threshold", 0.005),
+        )
         self.attention = AttentionScorer(config["attention_rates"], config["attention_alpha"])
         self.buffer = TemporalBuffer(config["buffer_seconds"])
         self.pattern_detector = PatternDetector(

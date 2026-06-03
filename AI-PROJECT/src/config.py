@@ -23,7 +23,7 @@ CONFIG = {
     "video_ear_threshold": 0.035,
     "video_sleep_duration": 3.5,
     "video_progressive_drowsiness_ear_threshold": 0.035,
-    "video_use_pitch_distraction": False,
+    "video_use_pitch_distraction": True,
     "phone_detection_enabled": True,
     "phone_model_path": "yolov8n.pt",
     "phone_confidence": 0.35,
@@ -38,8 +38,11 @@ CONFIG = {
     "pitch_down_threshold": -25.0,
     "ear_threshold": 0.22,
     "sleep_duration": 3.0,
-    "mar_threshold": 0.60,
-    "talk_duration": 2.0,
+    "mar_threshold": 0.60,              # MAR above this = mouth "open" (for transition counting)
+    "talk_duration": 2.0,                # seconds of sustained oscillation before flagging talking
+    "talk_window": 1.5,                  # rolling window (seconds) for oscillation analysis
+    "talk_min_transitions": 3,           # min closed→open transitions in window to detect speech
+    "talk_mar_variance_threshold": 0.005, # min MAR variance in window (alternative trigger)
     "absent_duration": 3.0,
 
     "attention_alpha": 0.15,
