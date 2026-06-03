@@ -551,6 +551,13 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     ]
     write_csv(summary_csv, summary_rows, summary_fields)
 
+    # --- auto-generate heatmap + confusion matrix ---
+    try:
+        from src.analytics import run_post_analytics
+        run_post_analytics(detail_csv)
+    except Exception as exc:
+        print(f"[WARN] Post-analysis failed: {exc}")
+
     elapsed = time.time() - start
     return {
         "output_video": output_video,
