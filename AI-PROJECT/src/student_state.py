@@ -15,7 +15,12 @@ class StudentState:
         self.attention = AttentionScorer(config["attention_rates"], config["attention_alpha"])
         self.buffer = TemporalBuffer(config["buffer_seconds"])
         self.pattern_detector = PatternDetector(
-            config.get("progressive_drowsiness_ear_threshold", config["ear_threshold"])
+            config.get("progressive_drowsiness_ear_threshold", config["ear_threshold"]),
+            config.get("frequent_distraction_window", 30.0),
+            config.get("frequent_distraction_seconds", 3.0),
+            config.get("sustained_distraction_seconds", 5.0),
+            config.get("rapid_attention_drop_window", 20.0),
+            config.get("rapid_attention_drop_points", 30.0),
         )
         self.state_durations = defaultdict(float)
         self.alert_counts = defaultdict(int)

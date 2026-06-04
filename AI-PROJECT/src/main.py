@@ -51,7 +51,10 @@ def run():
     head_pose = HeadPoseEstimator()
     eye_monitor = EyeMonitor(CONFIG["ear_threshold"], CONFIG["sleep_duration"])
     mouth_monitor = MouthMonitor(CONFIG["mar_threshold"], CONFIG["talk_duration"])
-    state_classifier = StateClassifier(CONFIG["yaw_threshold"], CONFIG["pitch_down_threshold"])
+    state_classifier = StateClassifier(
+        CONFIG.get("live_yaw_threshold", CONFIG["yaw_threshold"]),
+        CONFIG.get("live_pitch_down_threshold", CONFIG["pitch_down_threshold"]),
+    )
     liveness_detector = LivenessDetector(
         CONFIG["liveness_threshold"],
         CONFIG["liveness_warmup_seconds"],
@@ -61,7 +64,14 @@ def run():
     identity_verifier = IdentityVerifier(face_detector, CONFIG["identity_similarity_threshold"])
     attention = AttentionScorer(CONFIG["attention_rates"], CONFIG["attention_alpha"])
     buffer = TemporalBuffer(CONFIG["buffer_seconds"])
-    pattern_detector = PatternDetector()
+    pattern_detector = PatternDetector(
+        CONFIG["ear_threshold"],
+        CONFIG.get("frequent_distraction_window", 30.0),
+        CONFIG.get("frequent_distraction_seconds", 3.0),
+        CONFIG.get("sustained_distraction_seconds", 5.0),
+        CONFIG.get("rapid_attention_drop_window", 20.0),
+        CONFIG.get("rapid_attention_drop_points", 30.0),
+    )
     decision_engine = DecisionEngine()
     alert_system = AlertSystem(CONFIG["violations_csv"], CONFIG["evidence_images_dir"])
     dashboard = Dashboard()
@@ -96,6 +106,7 @@ def run():
     fps = 0.0
     last_pattern_eval = 0.0
     active_patterns = []
+    distraction_started_at = None
 
     print("[INFO] System started. Press q or ESC to exit.")
     while True:
@@ -141,6 +152,13 @@ def run():
                 face_similarity = identity_result.similarity
 
             state = state_classifier.classify(True, yaw, pitch, sleeping, talking)
+            if state == "DISTRACTED":
+                if distraction_started_at is None:
+                    distraction_started_at = now
+                if now - distraction_started_at < CONFIG.get("live_distraction_duration", 1.0):
+                    state = "OK"
+            else:
+                distraction_started_at = None
             record.update({
                 "ear": ear,
                 "mar": mar,

@@ -23,6 +23,17 @@ class TemporalBuffer:
     def count_state(self, state, seconds):
         return sum(1 for r in self.last(seconds) if r.get("state") == state)
 
+    def duration_state(self, state, seconds):
+        records = self.last(seconds)
+        if len(records) < 2:
+            return 0.0
+
+        total = 0.0
+        for current, next_record in zip(records, records[1:]):
+            if current.get("state") == state:
+                total += max(0.0, next_record["timestamp"] - current["timestamp"])
+        return total
+
     def continuous_duration(self, state):
         if not self.records:
             return 0.0

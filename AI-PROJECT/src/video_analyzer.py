@@ -8,7 +8,7 @@ import cv2
 from src.config import CONFIG, PROJECT_ROOT
 from src.face_detector import FaceDetector
 from src.head_pose import HeadPoseEstimator
-from src.phone_detector import PhoneDetector, expanded_intersection
+from src.phone_detector import PhoneDetector, expanded_intersection, bbox_iou
 from src.state_classifier import StateClassifier
 from src.student_state import StudentState
 from src.video_tracker import CentroidTracker
@@ -93,24 +93,54 @@ def near_recent_phone(bbox, phone_centers, width, height, max_ratio):
     return nearest <= max_ratio
 
 
-def assign_phones_to_people(person_bboxes, phone_detections):
+def phone_center_is_owned_by_person(
+    phone_bbox,
+    person_bbox,
+    max_relative_y,
+    min_width_ratio=0.0,
+    min_height_ratio=0.0,
+):
+    phone_center = bbox_center(phone_bbox)
+    if not point_inside_bbox(phone_center, person_bbox):
+        return False
+
+    _, py, pw, ph = person_bbox
+    _, _, phone_w, phone_h = phone_bbox
+    relative_y = (phone_center[1] - py) / max(ph, 1)
+    width_ratio = phone_w / max(pw, 1)
+    height_ratio = phone_h / max(ph, 1)
+    return (
+        relative_y <= max_relative_y
+        and width_ratio >= min_width_ratio
+        and height_ratio >= min_height_ratio
+    )
+
+
+def assign_phones_to_people(
+    person_bboxes,
+    phone_detections,
+    max_relative_y=0.92,
+    min_width_ratio=0.0,
+    min_height_ratio=0.0,
+):
     owners = set()
-    for phone in phone_detections:
-        phone_center = bbox_center(phone.bbox)
+    assigned_phone_indices = set()
+    for phone_idx, phone in enumerate(phone_detections):
         candidates = [
-            (normalized_distance_to_bbox_center(phone_center, bbox), idx)
+            (normalized_distance_to_bbox_center(bbox_center(phone.bbox), bbox), idx)
             for idx, bbox in enumerate(person_bboxes)
-            if point_inside_bbox(phone_center, bbox)
+            if phone_center_is_owned_by_person(
+                phone.bbox,
+                bbox,
+                max_relative_y,
+                min_width_ratio,
+                min_height_ratio,
+            )
         ]
-        if not candidates:
-            candidates = [
-                (normalized_distance_to_bbox_center(phone_center, bbox), idx)
-                for idx, bbox in enumerate(person_bboxes)
-                if expanded_intersection(bbox, phone.bbox, 1.05)
-            ]
         if candidates:
             owners.add(min(candidates)[1])
-    return owners
+            assigned_phone_indices.add(phone_idx)
+    return owners, assigned_phone_indices
 
 
 def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
@@ -155,6 +185,8 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     video_config = dict(CONFIG)
     video_config["ear_threshold"] = CONFIG.get("video_ear_threshold", CONFIG["ear_threshold"])
     video_config["sleep_duration"] = CONFIG.get("video_sleep_duration", CONFIG["sleep_duration"])
+    video_config["mar_threshold"] = CONFIG.get("video_mar_threshold", CONFIG["mar_threshold"])
+    video_config["talk_duration"] = CONFIG.get("video_talk_duration", CONFIG["talk_duration"])
     video_config["progressive_drowsiness_ear_threshold"] = CONFIG.get(
         "video_progressive_drowsiness_ear_threshold",
         video_config["ear_threshold"],
@@ -163,6 +195,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
         CONFIG.get("phone_model_path", "yolov8n.pt"),
         CONFIG.get("phone_confidence", 0.35),
         CONFIG.get("phone_detection_enabled", True),
+        person_confidence=CONFIG.get("person_confidence", CONFIG.get("phone_confidence", 0.35)),
+        phone_min_aspect_ratio=CONFIG.get("phone_min_aspect_ratio", 1.2),
+        phone_max_aspect_ratio=CONFIG.get("phone_max_aspect_ratio", 4.8),
     )
     if phone_detector.warning:
         print(f"[WARN] {phone_detector.warning}")
@@ -175,6 +210,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     peer_distraction_started_at: dict[int, float] = {}
     confirmed_phone_context_until = 0.0
     confirmed_phone_centers = []
+    person_memory: dict[int, dict] = {}
     detail_rows = []
 
     frame_idx = 0
@@ -204,27 +240,98 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
 
         active_phone_users = 0
         active_phone_centers = []
+        memory_visible_count = 0
+        assigned_phone_indices = set()
 
+        use_yolo_backend = CONFIG.get("person_tracker_backend", "centroid") == "yolo"
         use_person_tracking = (
             CONFIG.get("person_tracking_enabled", True)
             and phone_detector.available
-            and bool(person_detections)
+            and (bool(person_detections) or (use_yolo_backend and bool(person_memory)))
         )
 
         if use_person_tracking:
             person_bboxes = [person.bbox for person in person_detections]
-            phone_owner_indices = assign_phones_to_people(person_bboxes, phone_detections)
+            phone_owner_indices, assigned_phone_indices = assign_phones_to_people(
+                person_bboxes,
+                phone_detections,
+                CONFIG.get("phone_owner_max_relative_y", 0.92),
+                CONFIG.get("phone_owner_min_width_ratio", 0.0),
+                CONFIG.get("phone_owner_min_height_ratio", 0.0),
+            )
             use_yolo_track_ids = (
-                CONFIG.get("person_tracker_backend", "centroid") == "yolo"
-                and any(person.track_id is not None for person in person_detections)
+                use_yolo_backend
+                and (not person_detections or any(person.track_id is not None for person in person_detections))
             )
             if use_yolo_track_ids:
-                assignments = {
-                    det_idx: person.track_id
-                    for det_idx, person in enumerate(person_detections)
-                    if person.track_id is not None
-                }
+                assignments = {}
+                assigned_track_ids = set()
+                assigned_bboxes = []
+                ordered_detection_indices = sorted(
+                    range(len(person_detections)),
+                    key=lambda idx: (
+                        person_detections[idx].track_id not in person_memory,
+                        -person_detections[idx].confidence,
+                    ),
+                )
+
+                for det_idx in ordered_detection_indices:
+                    person = person_detections[det_idx]
+                    proposed_track_id = person.track_id
+                    chosen_track_id = None
+
+                    if proposed_track_id in person_memory and proposed_track_id not in assigned_track_ids:
+                        chosen_track_id = proposed_track_id
+
+                    available_memory_ids = set(person_memory) - assigned_track_ids
+                    if chosen_track_id is None and available_memory_ids:
+                        candidates = []
+                        person_center = bbox_center(person.bbox)
+                        for memory_track_id in available_memory_ids:
+                            memory_bbox = person_memory[memory_track_id]["bbox"]
+                            overlap = bbox_iou(person.bbox, memory_bbox)
+                            distance = frame_distance_ratio(
+                                person_center,
+                                bbox_center(memory_bbox),
+                                width,
+                                height,
+                            )
+                            if overlap >= 0.08 or distance <= 0.16:
+                                candidates.append((overlap, -distance, memory_track_id))
+
+                        if candidates:
+                            _, _, chosen_track_id = max(candidates)
+
+                    duplicate_existing_box = any(
+                        bbox_iou(person.bbox, assigned_bbox) >= 0.45
+                        for assigned_bbox in assigned_bboxes
+                    )
+                    allow_new_track = (
+                        timestamp <= CONFIG.get("person_new_track_grace_seconds", 2.0)
+                        or not students
+                        or proposed_track_id in students
+                    )
+                    if (
+                        chosen_track_id is None
+                        and proposed_track_id is not None
+                        and not duplicate_existing_box
+                        and allow_new_track
+                    ):
+                        chosen_track_id = proposed_track_id
+
+                    if chosen_track_id is None:
+                        continue
+
+                    assignments[det_idx] = chosen_track_id
+                    assigned_track_ids.add(chosen_track_id)
+                    assigned_bboxes.append(person.bbox)
+
                 tracks = {}
+                for det_idx, track_id in assignments.items():
+                    person_memory[track_id] = {
+                        "bbox": person_bboxes[det_idx],
+                        "last_seen": timestamp,
+                    }
             else:
                 assignments, tracks = person_tracker.update(person_bboxes)
             matched_track_ids = set(assignments.values())
@@ -330,6 +437,46 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                     cv2.rectangle(frame, (fx, fy), (fx + fw, fy + fh), color, 1)
                 cv2.putText(frame, f"{label} {state} {score:.1f}", (x, max(20, y - 8)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+            if use_yolo_track_ids:
+                memory_seconds = CONFIG.get("person_memory_seconds", 0.0)
+                for track_id, memory in list(person_memory.items()):
+                    if track_id in matched_track_ids:
+                        continue
+
+                    missing_for = timestamp - memory["last_seen"]
+                    if missing_for > memory_seconds:
+                        del person_memory[track_id]
+                        continue
+
+                    label = f"Student_{track_id}"
+                    if track_id not in students:
+                        students[track_id] = StudentState(label, video_config)
+
+                    state = "BODY_ONLY"
+                    record = {
+                        "timestamp": timestamp,
+                        "student": label,
+                        "state": state,
+                        "ear": 0.0,
+                        "mar": 0.0,
+                        "yaw": 0.0,
+                        "pitch": 0.0,
+                        "roll": 0.0,
+                        "attention_score": students[track_id].attention.display_score,
+                        "phone_detected": False,
+                    }
+                    score, patterns = students[track_id].update(record, dt)
+                    record["attention_score"] = score
+                    record["patterns"] = "; ".join(patterns)
+                    detail_rows.append(record.copy())
+                    memory_visible_count += 1
+
+                    x, y, w, h = memory["bbox"]
+                    color = color_for_state(state)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1)
+                    cv2.putText(frame, f"{label} {state} {score:.1f}", (x, max(20, y - 8)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
         else:
             assignments, tracks = face_tracker.update(detection.faces)
             matched_track_ids = set(assignments.values())
@@ -412,7 +559,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
         if active_phone_centers:
             confirmed_phone_centers = active_phone_centers
 
-        for phone in phone_detections:
+        for phone_idx, phone in enumerate(phone_detections):
+            if use_person_tracking and phone_idx not in assigned_phone_indices:
+                continue
             x, y, w, h = phone.bbox
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 255), 2)
             cv2.putText(frame, f"PHONE {phone.confidence:.2f}", (x, max(20, y - 6)),
@@ -440,7 +589,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
             detail_rows.append(record.copy())
 
         visible_label = "Persons" if use_person_tracking else "Faces"
-        cv2.putText(frame, f"Time: {timestamp:.1f}s | {visible_label}: {len(assignments)} | IDs: {len(students)} | Raw Phones: {len(phone_detections)} | Active Phone Users: {active_phone_users}",
+        cv2.putText(frame, f"Time: {timestamp:.1f}s | {visible_label}: {len(assignments) + memory_visible_count} | IDs: {len(students)} | Raw Phones: {len(phone_detections)} | Active Phone Users: {active_phone_users}",
                     (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 220, 255), 2)
         writer.write(frame)
         if show:
