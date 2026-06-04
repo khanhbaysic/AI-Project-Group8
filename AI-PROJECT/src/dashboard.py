@@ -3,13 +3,15 @@ from datetime import datetime
 
 import cv2
 
+from src.states import PHONE_USAGE, SLEEPING, TALKING
+
 
 # Large on-screen alert messages for critical behavioral states.
 # Each entry: state -> (label, background_color, text_color)
 _STATE_ALERTS = {
-    "SLEEPING":    ("SLEEPING DETECTED",       (0,  50, 200), (255, 255, 255)),
-    "TALKING":     ("TALKING DETECTED",        (180, 100, 0), (255, 255, 255)),
-    "PHONE_USAGE": ("PHONE USAGE DETECTED",    (180,   0, 180), (255, 255, 255)),
+    SLEEPING:    ("SLEEPING DETECTED",       (0,  50, 200), (255, 255, 255)),
+    TALKING:     ("TALKING DETECTED",        (180, 100, 0), (255, 255, 255)),
+    PHONE_USAGE: ("PHONE USAGE DETECTED",    (180,   0, 180), (255, 255, 255)),
 }
 
 

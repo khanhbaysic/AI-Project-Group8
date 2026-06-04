@@ -49,9 +49,7 @@ import sys
 from collections import defaultdict, Counter
 from pathlib import Path
 
-
-STATES = ["OK", "DISTRACTED", "TALKING", "SLEEPING",
-          "ABSENT", "PHONE_USAGE", "BODY_ONLY"]
+from src.states import EVAL_STATES as STATES
 
 
 # ---------------------------------------------------------------------------

@@ -28,32 +28,28 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from src.states import (
+    OK, BODY_ONLY, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT,
+    ALL_STATES, LABEL_VI,
+)
+
 
 # ---------------------------------------------------------------------------
 # Cau hinh mau & nhan trang thai  (de chinh sua tap trung mot cho)
 # ---------------------------------------------------------------------------
 
 STATE_COLORS = {
-    "OK":          "#22c55e",   # xanh la  - tap trung
-    "BODY_ONLY":   "#94a3b8",   # xam      - chi thay than, khong ro mat
-    "DISTRACTED":  "#f59e0b",   # cam      - mat tap trung
-    "TALKING":     "#a855f7",   # tim      - noi chuyen
-    "PHONE_USAGE": "#ef4444",   # do       - dung dien thoai
-    "SLEEPING":    "#3b82f6",   # xanh duong - ngu gat
-    "ABSENT":      "#1e293b",   # den      - vang mat
+    OK:          "#22c55e",   # xanh la  - tap trung
+    BODY_ONLY:   "#94a3b8",   # xam      - chi thay than, khong ro mat
+    DISTRACTED:  "#f59e0b",   # cam      - mat tap trung
+    TALKING:     "#a855f7",   # tim      - noi chuyen
+    PHONE_USAGE: "#ef4444",   # do       - dung dien thoai
+    SLEEPING:    "#3b82f6",   # xanh duong - ngu gat
+    ABSENT:      "#1e293b",   # den      - vang mat
 }
-STATE_ORDER = ["OK", "BODY_ONLY", "DISTRACTED", "TALKING",
-               "PHONE_USAGE", "SLEEPING", "ABSENT"]
+STATE_ORDER = ALL_STATES
 
-STATE_LABEL_VI = {
-    "OK":          "Tap trung",
-    "BODY_ONLY":   "Khong ro mat",
-    "DISTRACTED":  "Mat tap trung",
-    "TALKING":     "Noi chuyen",
-    "PHONE_USAGE": "Dung dien thoai",
-    "SLEEPING":    "Ngu gat",
-    "ABSENT":      "Vang mat",
-}
+STATE_LABEL_VI = LABEL_VI
 
 
 # ---------------------------------------------------------------------------

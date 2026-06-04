@@ -1,61 +1,86 @@
 # Intelligent E-Proctoring System
 
-This project implements a lightweight real-time e-proctoring prototype using webcam-based facial behavior analysis.
+A **rule-based** real-time e-proctoring prototype that monitors student behavior through webcam video. It uses **MediaPipe FaceMesh** for face detection and landmark extraction, hand-crafted geometric rules (EAR, MAR, head angles) for state classification, and an optional **pre-trained YOLOv8n** (`yolov8n.pt`) for person/cell-phone detection. **No custom model is trained** — all thresholds are configured in `src/config.py`.
 
 ## Features
 
 - Real-time webcam monitoring with OpenCV.
-- MediaPipe FaceMesh landmark extraction.
-- Head pose estimation with `cv2.solvePnP`.
-- EAR-based drowsiness detection.
-- MAR-based talking detection.
-- Liveness score from blink, head motion, and landmark motion cues.
-- Student ID lookup from a local CSV database.
+- **MediaPipe FaceMesh** landmark extraction (478 points, no Haar Cascade).
+- Head pose estimation via `cv2.solvePnP` with 14 landmarks and `atan2`-based Euler extraction.
+- EAR-based drowsiness detection (eye closure ≥ 3 s).
+- MAR-based talking detection (mouth open ≥ 2 s).
+- Liveness score from blink rate, head motion, and landmark motion.
+- Student ID lookup from a local CSV database (`database/students.csv`).
 - Face verification with a lightweight FaceMesh landmark embedding.
-- Continuous Attention Score from 0 to 100.
-- 60-second temporal buffer and temporal pattern alerts.
-- Evidence image capture and CSV logging.
-- Live dashboard with state, alerts, identity, liveness, metrics, and attention trend.
+- Continuous Attention Score (0–100) with configurable decay/recovery rates.
+- 60-second temporal buffer and pattern-based alerts (e.g., repeated drowsiness).
+- Evidence image capture and CSV violation logging.
+- Live dashboard showing state, alerts, identity, liveness, metrics, and attention trend.
+- Recorded-video analysis mode with per-student tracking and summary CSV.
+- Optional phone/person detection using a **pre-trained YOLOv8n** (COCO classes `person` and `cell phone` only — no custom training).
 
 ## Project Structure
 
 ```text
 AI-PROJECT/
-  main.py
-  src/
-    main.py
-    face_detector.py
-    liveness_detector.py
-    identity_verifier.py
-    database.py
-    head_pose.py
-    eye_monitor.py
-    mouth_monitor.py
-    state_classifier.py
-    alert_system.py
-    dashboard.py
-    behavior_analyzer/
-      temporal_buffer.py
-      attention_score.py
-      pattern_detector.py
-      decision_engine.py
-  database/
-    students.csv
-    reference_images/
-  evidence/
-    violations.csv
-    images/
+  main.py                        # Entry point (imports src.main)
   requirements.txt
   run_main.bat
+  run_video_analysis.bat
+  yolov8n.pt                     # Pre-trained YOLO (person + phone detection)
+  src/
+    __init__.py
+    config.py                    # All thresholds and settings
+    main.py                      # Webcam loop + dashboard
+    face_detector.py             # MediaPipe FaceMesh wrapper
+    head_pose.py                 # solvePnP + atan2 Euler angles
+    eye_monitor.py               # EAR calculation + sleep detection
+    mouth_monitor.py             # MAR calculation + talk detection
+    state_classifier.py          # Rule-based state classifier
+    student_state.py             # Per-student state aggregation
+    alert_system_v2.py           # Evidence capture + CSV logging
+    dashboard.py                 # Live OpenCV dashboard overlay
+    liveness_detector.py         # Blink/motion liveness scoring
+    identity_verifier.py         # FaceMesh-embedding face verification
+    database.py                  # students.csv loader
+    phone_detector.py            # YOLOv8n person + phone detector
+    video_analyzer.py            # Recorded-video analysis pipeline
+    video_tracker.py             # Centroid-based multi-face tracker
+    behavior_analyzer/
+      __init__.py
+      temporal_buffer.py         # Rolling metric buffer
+      attention_score.py         # EMA attention score
+      pattern_detector.py        # Temporal pattern rules
+      decision_engine.py         # Alert decision logic
+    analytics/
+      __init__.py
+      evaluate.py                # Accuracy evaluation helpers
+      session_report.py          # Post-session HTML/PDF report
+  database/
+    students.csv                 # student_id, name, reference_image
+    reference_images/            # One image per student
+  evidence/
+    violations.csv               # Auto-generated violation log
+    images/                      # Auto-captured evidence screenshots
+  output/
+    video_analysis/              # Video analyzer outputs
 ```
 
 ## Setup
 
-Install dependencies with Python 3.12:
+Install dependencies (Python 3.12):
 
 ```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+For phone detection, also install:
+
+```bat
+python -m pip install ultralytics
+```
+
+The first run may download `yolov8n.pt` if it is not already present.
 
 ## Student Database Format
 
@@ -66,9 +91,9 @@ student_id,name,reference_image
 202417140,Sample Student,reference_images/202417140.jpg
 ```
 
-The `reference_image` path is relative to the `database/` folder unless an absolute path is provided.
+The `reference_image` path is relative to the `database/` folder unless an absolute path is given.
 
-## Run
+## Run (Webcam Mode)
 
 ```bat
 run_main.bat
@@ -77,14 +102,12 @@ run_main.bat
 Or:
 
 ```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe main.py
+python main.py
 ```
 
 Enter the student ID when prompted.
 
-## Analyze A Recorded Classroom Video
-
-You can also use a recorded classroom video instead of the webcam workflow.
+## Analyze a Recorded Classroom Video
 
 ```bat
 run_video_analysis.bat "C:\path\to\class_recording.mp4"
@@ -93,24 +116,10 @@ run_video_analysis.bat "C:\path\to\class_recording.mp4"
 Or:
 
 ```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m src.video_analyzer "C:\path\to\class_recording.mp4"
+python -m src.video_analyzer "C:\path\to\class_recording.mp4"
 ```
 
-The analyzer automatically detects and tracks faces as:
-
-```text
-Student_1
-Student_2
-Student_3
-```
-
-Outputs are saved to:
-
-```text
-output/video_analysis/
-```
-
-Generated files:
+The analyzer auto-detects and tracks faces as `Student_1`, `Student_2`, etc. Outputs are saved to `output/video_analysis/`:
 
 ```text
 <video_name>_annotated.mp4
@@ -118,23 +127,11 @@ Generated files:
 <video_name>_summary.csv
 ```
 
-Current limitation: the first version uses centroid tracking, so student IDs are stable when students remain roughly in place. If students cross over each other or leave/re-enter often, a stronger tracker such as DeepSORT or face embeddings should be added.
-
-For classroom video analysis, downward head pose is not treated as distracted by default because students may be writing notes or doing a paper exercise. The video mode mainly flags strong side-looking, sleeping, talking, and absence. You can re-enable downward distraction by setting `video_use_pitch_distraction` to `True` in `src/config.py`.
+**Tracking limitation:** Centroid-based tracking works well when students stay roughly in place. For frequent crossings or re-entries, a stronger tracker (DeepSORT, face embeddings) would be needed.
 
 ### Optional Phone Usage Detection
 
-The video analyzer includes optional phone detection. It uses YOLO through the `ultralytics` package to detect the COCO class `cell phone`.
-
-Install the optional dependency:
-
-```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m pip install ultralytics
-```
-
-Then run the analyzer again. The first run may download `yolov8n.pt` if it is not already available.
-
-Relevant settings in `src/config.py`:
+When `ultralytics` is installed and `phone_detection_enabled` is `True` in `src/config.py`, the analyzer uses the **pre-trained YOLOv8n** to detect COCO classes `person` and `cell phone`. No custom YOLO training is performed. Relevant settings:
 
 ```python
 "phone_detection_enabled": True,
@@ -144,26 +141,21 @@ Relevant settings in `src/config.py`:
 "phone_near_student_scale": 1.8,
 ```
 
-When a phone is detected near a tracked student, that student is labeled:
+When a phone is detected near a tracked student, that student is labeled `PHONE_USAGE`.
 
-```text
-PHONE_USAGE
-```
+## How to Test
 
-and `phone_usage_seconds` appears in the summary CSV.
+- **ABSENT**: Leave the camera frame.
+- **DISTRACTED**: Look left/right or downward past the configured thresholds.
+- **SLEEPING**: Close eyes for ≥ 3 seconds.
+- **TALKING**: Keep mouth open above the MAR threshold for ≥ 2 seconds.
+- **SPOOFING**: Hold a static photo in front of the webcam; the liveness score should stay low after warmup.
+- **Identity Mismatch**: Use a different face from the one in `database/students.csv`.
+- **Attention Score**: Observe it decrease during negative states and recover during `OK`.
 
-## How To Test
+## Notes and Limitations
 
-- `ABSENT`: leave the camera frame.
-- `DISTRACTED`: look left/right or downward beyond the configured thresholds.
-- `SLEEPING`: close eyes for at least 3 seconds.
-- `TALKING`: keep mouth open above the MAR threshold for at least 2 seconds.
-- `SPOOFING`: hold a static image/photo in front of the webcam; after warmup the liveness score should remain low.
-- `Identity Mismatch`: use a different face from the reference image in `database/students.csv`.
-- `Attention Score`: observe the score decrease during negative states and recover slowly during `OK`.
-
-## Notes And Limitations
-
-The current identity verifier uses a CPU-friendly FaceMesh landmark embedding and cosine similarity. This is explainable and easy to run, but it is not as accurate as a production face recognition model. For stronger identity verification, replace `src/identity_verifier.py` with ArcFace, InsightFace, DeepFace, or another face embedding model.
-
-The liveness detector uses blink and motion cues. It is suitable for an academic prototype, but a dedicated anti-spoofing model would be required for high-stakes deployment.
+- This is a **rule-based prototype** — all decisions come from hand-tuned thresholds, not a trained classifier. Accuracy depends on lighting, camera angle, and individual facial geometry.
+- The identity verifier uses a CPU-friendly FaceMesh landmark embedding with cosine similarity. For stronger verification, replace with ArcFace, InsightFace, or DeepFace.
+- The liveness detector uses blink and motion heuristics. A dedicated anti-spoofing model would be needed for high-stakes use.
+- `yolov8n.pt` is a **pre-trained** YOLO model used only for `person` and `cell phone` detection — it is not fine-tuned on any project-specific data.

@@ -5,6 +5,7 @@ from src.behavior_analyzer.pattern_detector import PatternDetector
 from src.behavior_analyzer.temporal_buffer import TemporalBuffer
 from src.eye_monitor import EyeMonitor
 from src.mouth_monitor import MouthMonitor
+from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
 
 
 class StudentState:
@@ -47,12 +48,12 @@ class StudentState:
             "student": self.student_label,
             "total_seconds": round(total, 2),
             "final_attention_score": round(self.attention.display_score, 2),
-            "ok_seconds": round(self.state_durations["OK"], 2),
-            "distracted_seconds": round(self.state_durations["DISTRACTED"], 2),
-            "sleeping_seconds": round(self.state_durations["SLEEPING"], 2),
-            "talking_seconds": round(self.state_durations["TALKING"], 2),
-            "phone_usage_seconds": round(self.state_durations["PHONE_USAGE"], 2),
-            "body_only_seconds": round(self.state_durations["BODY_ONLY"], 2),
-            "absent_seconds": round(self.state_durations["ABSENT"], 2),
+            "ok_seconds": round(self.state_durations[OK], 2),
+            "distracted_seconds": round(self.state_durations[DISTRACTED], 2),
+            "sleeping_seconds": round(self.state_durations[SLEEPING], 2),
+            "talking_seconds": round(self.state_durations[TALKING], 2),
+            "phone_usage_seconds": round(self.state_durations[PHONE_USAGE], 2),
+            "body_only_seconds": round(self.state_durations[BODY_ONLY], 2),
+            "absent_seconds": round(self.state_durations[ABSENT], 2),
             "pattern_alerts": "; ".join(f"{k}:{v}" for k, v in sorted(self.alert_counts.items())),
         }

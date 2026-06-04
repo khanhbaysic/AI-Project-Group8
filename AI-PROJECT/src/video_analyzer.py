@@ -10,6 +10,7 @@ from src.face_detector import FaceDetector
 from src.head_pose import HeadPoseEstimator
 from src.phone_detector import PhoneDetector, expanded_intersection
 from src.state_classifier import StateClassifier
+from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
 from src.student_state import StudentState
 from src.video_tracker import CentroidTracker
 
@@ -19,13 +20,13 @@ OUTPUT_DIR = PROJECT_ROOT / "output" / "video_analysis"
 
 def color_for_state(state):
     return {
-        "OK": (0, 220, 80),
-        "DISTRACTED": (0, 200, 255),
-        "TALKING": (255, 180, 0),
-        "SLEEPING": (0, 80, 255),
-        "ABSENT": (80, 80, 80),
-        "PHONE_USAGE": (255, 0, 255),
-        "BODY_ONLY": (180, 180, 180),
+        OK:          (0, 220, 80),
+        DISTRACTED:  (0, 200, 255),
+        TALKING:     (255, 180, 0),
+        SLEEPING:    (0, 80, 255),
+        ABSENT:      (80, 80, 80),
+        PHONE_USAGE: (255, 0, 255),
+        BODY_ONLY:   (180, 180, 180),
     }.get(state, (220, 220, 220))
 
 
@@ -359,11 +360,11 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                 else:
                     face_bbox = None
                     yaw = pitch = roll = ear = mar = 0.0
-                    state = "BODY_ONLY"
+                    state = BODY_ONLY
                     distraction_scores[track_id] = 0.0
 
                 if phone_detected:
-                    state = "PHONE_USAGE"
+                    state = PHONE_USAGE
 
                 record = {
                     "timestamp": timestamp,
@@ -417,7 +418,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                     phone_started_at.pop(track_id, None)
                     phone_detected = False
                 if phone_detected:
-                    state = "PHONE_USAGE"
+                    state = PHONE_USAGE
 
                 record = {
                     "timestamp": timestamp,
@@ -468,9 +469,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                         phone_started_at.pop(track_key, None)
                         phone_detected = False
 
-                    state = "BODY_ONLY"
+                    state = BODY_ONLY
                     if phone_detected:
-                        state = "PHONE_USAGE"
+                        state = PHONE_USAGE
                     record = {
                         "timestamp": timestamp,
                         "student": label,
@@ -507,7 +508,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
             record = {
                 "timestamp": timestamp,
                 "student": label,
-                "state": "ABSENT",
+                "state": ABSENT,
                 "ear": 0.0,
                 "mar": 0.0,
                 "yaw": 0.0,
