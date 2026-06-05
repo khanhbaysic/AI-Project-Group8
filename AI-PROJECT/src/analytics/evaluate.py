@@ -77,6 +77,9 @@ def collect_pairs_clip(labels_csv, details_dir):
         for row in csv.DictReader(f):
             clip = row["clip"].strip()
             y_true = row["true_state"].strip()
+            if not y_true:
+                missing.append(f"{clip} (missing true_state)")
+                continue
             # tim file details tuong ung: <clip>_details.csv
             cand = details_dir / f"{clip}_details.csv"
             if not cand.exists():
@@ -103,9 +106,12 @@ def collect_pairs_segment(labels_csv, details_csv):
     segs = defaultdict(list)
     with open(labels_csv, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
+            true_state = row["true_state"].strip()
+            if not true_state:
+                continue
             segs[row["student"].strip()].append((
                 float(row["start"]), float(row["end"]),
-                row["true_state"].strip()
+                true_state
             ))
 
     def true_state_at(student, t):
@@ -157,7 +163,8 @@ def metrics_per_class(M, labels):
         out[lab] = {"precision": prec, "recall": rec, "f1": f1,
                     "support": support}
     accuracy = correct / total if total else 0.0
-    # macro avg (chi tinh tren cac lop co support > 0)
+    # macro avg chi tinh tren cac lop co ground-truth label.
+    # Cac lop support=0 van duoc in trong report de thay ro test set con thieu.
     present = [l for l in labels if out[l]["support"] > 0]
     macro = {
         "precision": sum(out[l]["precision"] for l in present) / len(present) if present else 0,
@@ -167,17 +174,27 @@ def metrics_per_class(M, labels):
     return out, accuracy, macro, total
 
 
+def missing_ground_truth_states(per_class, labels):
+    """Return states with zero ground-truth support in the evaluated samples."""
+    return [lab for lab in labels if per_class[lab]["support"] == 0]
+
+
 # ---------------------------------------------------------------------------
 # Xuat ket qua
 # ---------------------------------------------------------------------------
 
 def format_report(per_class, accuracy, macro, total, labels):
+    missing = missing_ground_truth_states(per_class, labels)
     lines = []
     lines.append("=" * 64)
     lines.append(" BAO CAO DANH GIA (EVALUATION REPORT)")
     lines.append("=" * 64)
     lines.append(f" Tong so mau (samples): {total}")
     lines.append(f" Accuracy             : {accuracy*100:.2f}%")
+    lines.append(
+        " States without ground-truth labels: "
+        + (", ".join(missing) if missing else "None")
+    )
     lines.append("-" * 64)
     lines.append(f" {'Trang thai':<14}{'Precision':>10}{'Recall':>10}"
                  f"{'F1':>8}{'Support':>9}")
@@ -185,12 +202,14 @@ def format_report(per_class, accuracy, macro, total, labels):
     for lab in labels:
         m = per_class[lab]
         if m["support"] == 0:
+            lines.append(f" {lab:<14}{'NO LABELS':>28}{m['support']:>9}")
             continue
         lines.append(f" {lab:<14}{m['precision']:>10.3f}{m['recall']:>10.3f}"
                      f"{m['f1']:>8.3f}{m['support']:>9}")
     lines.append("-" * 64)
-    lines.append(f" {'MACRO AVG':<14}{macro['precision']:>10.3f}"
+    lines.append(f" {'MACRO AVG*':<14}{macro['precision']:>10.3f}"
                  f"{macro['recall']:>10.3f}{macro['f1']:>8.3f}")
+    lines.append(" *Macro avg is computed only over states with labels.")
     lines.append("=" * 64)
     return "\n".join(lines)
 
@@ -266,12 +285,18 @@ def main():
 
     if not pairs:
         print("[LOI] Khong co cap (true,pred) nao. Kiem tra lai file nhan.")
+        print("      Neu file duoc tao tu make_label_template.py, hay dien cot true_state truoc.")
         sys.exit(1)
 
     M = confusion(pairs, STATES)
     per_class, acc, macro, total = metrics_per_class(M, STATES)
     report = format_report(per_class, acc, macro, total, STATES)
     print(report)
+    missing_states = missing_ground_truth_states(per_class, STATES)
+    print(
+        "[INFO] States with no labels: "
+        + (", ".join(missing_states) if missing_states else "None")
+    )
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

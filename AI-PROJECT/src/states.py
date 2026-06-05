@@ -41,3 +41,15 @@ LABEL_VI = {
     SLEEPING:    "Ngu gat",
     ABSENT:      "Vang mat",
 }
+
+# Shared visual palette. Values are CSS hex colors; OpenCV callers can convert
+# them to BGR tuples when drawing frames.
+STATE_COLORS = {
+    OK:          "#22c55e",
+    BODY_ONLY:   "#94a3b8",
+    DISTRACTED:  "#f59e0b",
+    TALKING:     "#a855f7",
+    PHONE_USAGE: "#ef4444",
+    SLEEPING:    "#3b82f6",
+    ABSENT:      "#1e293b",
+}

@@ -28,9 +28,10 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from src.config import CONFIG
 from src.states import (
     OK, BODY_ONLY, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT,
-    ALL_STATES, LABEL_VI,
+    ALL_STATES, LABEL_VI, STATE_COLORS,
 )
 
 
@@ -38,15 +39,6 @@ from src.states import (
 # Cau hinh mau & nhan trang thai  (de chinh sua tap trung mot cho)
 # ---------------------------------------------------------------------------
 
-STATE_COLORS = {
-    OK:          "#22c55e",   # xanh la  - tap trung
-    BODY_ONLY:   "#94a3b8",   # xam      - chi thay than, khong ro mat
-    DISTRACTED:  "#f59e0b",   # cam      - mat tap trung
-    TALKING:     "#a855f7",   # tim      - noi chuyen
-    PHONE_USAGE: "#ef4444",   # do       - dung dien thoai
-    SLEEPING:    "#3b82f6",   # xanh duong - ngu gat
-    ABSENT:      "#1e293b",   # den      - vang mat
-}
 STATE_ORDER = ALL_STATES
 
 STATE_LABEL_VI = LABEL_VI
@@ -65,7 +57,7 @@ def load_details(csv_path):
                 rows.append({
                     "t": float(r.get("timestamp", 0) or 0),
                     "student": r.get("student", "?"),
-                    "state": (r.get("state") or "OK").strip(),
+                    "state": (r.get("state") or OK).strip(),
                     "ear": float(r.get("ear", 0) or 0),
                     "mar": float(r.get("mar", 0) or 0),
                     "yaw": float(r.get("yaw", 0) or 0),
@@ -125,6 +117,48 @@ def build_timeline(rows, n_bins=60):
 # 2. Tinh thong ke tom tat cho moi sinh vien (privacy-safe: chi so, khong anh)
 # ---------------------------------------------------------------------------
 
+def estimate_state_seconds(items):
+    """Estimate per-state seconds from consecutive detail rows for one student."""
+    ordered = sorted(items, key=lambda x: x["t"])
+    if not ordered:
+        return {}
+
+    steps = [
+        ordered[i + 1]["t"] - ordered[i]["t"]
+        for i in range(len(ordered) - 1)
+        if ordered[i + 1]["t"] > ordered[i]["t"]
+    ]
+    default_dt = (sum(steps) / len(steps)) if steps else 0.0
+
+    seconds = defaultdict(float)
+    for i, item in enumerate(ordered):
+        if i + 1 < len(ordered):
+            dt = max(0.0, ordered[i + 1]["t"] - item["t"])
+        else:
+            dt = default_dt
+        if dt > 0:
+            seconds[item["state"]] += dt
+    return dict(seconds)
+
+
+def score_contributions(state_seconds):
+    """Return per-state seconds, rate, and approximate score impact."""
+    rates = CONFIG["attention_rates"]
+    rows = []
+    for state in STATE_ORDER:
+        seconds = state_seconds.get(state, 0.0)
+        if seconds <= 0:
+            continue
+        rate = rates.get(state, 0.0)
+        rows.append({
+            "state": state,
+            "seconds": seconds,
+            "rate": rate,
+            "impact": seconds * rate,
+        })
+    return rows
+
+
 def per_student_stats(rows):
     by = defaultdict(list)
     for r in rows:
@@ -133,25 +167,26 @@ def per_student_stats(rows):
     stats = {}
     for s, items in by.items():
         items.sort(key=lambda x: x["t"])
-        dur = max(x["t"] for x in items) - min(x["t"] for x in items)
-        # dem ti le tung trang thai
-        cnt = defaultdict(int)
-        for x in items:
-            cnt[x["state"]] += 1
-        total = len(items)
-        dist = {k: cnt[k] / total for k in cnt}
+        state_seconds = estimate_state_seconds(items)
+        dur = sum(state_seconds.values())
+        total = max(dur, 1e-6)
+        dist = {k: state_seconds[k] / total for k in state_seconds}
         final_score = items[-1]["score"]
-        avg_score = sum(x["score"] for x in items) / total
+        avg_score = sum(x["score"] for x in items) / len(items)
         # ti le tap trung = % thoi gian o trang thai OK
-        focus_pct = dist.get("OK", 0.0) * 100
+        focus_pct = dist.get(OK, 0.0) * 100
         flags = sorted({x["patterns"] for x in items if x["patterns"]})
         phone = any(x["phone"] for x in items)
+        contributions = score_contributions(state_seconds)
         stats[s] = {
             "duration": dur,
             "final_score": final_score,
             "avg_score": avg_score,
             "focus_pct": focus_pct,
             "dist": dist,
+            "state_seconds": state_seconds,
+            "contributions": contributions,
+            "impact_total": sum(x["impact"] for x in contributions),
             "flags": flags,
             "phone": phone,
         }
@@ -242,6 +277,44 @@ def render_html(students, bins, grid, score_grid, stats,
         )
     heatmap_html = "\n".join(rows_html)
 
+    timeline_cards = []
+    for s in students:
+        points = []
+        scores = [
+            (bins[b], score_grid.get(s, {}).get(b))
+            for b in range(len(bins))
+            if score_grid.get(s, {}).get(b) is not None
+        ]
+        if scores:
+            t_min = bins[0]
+            t_max = bins[-1] if bins[-1] > bins[0] else bins[0] + 1.0
+            width, height = 620, 118
+            pad_l, pad_t, pad_r, pad_b = 34, 12, 12, 24
+            plot_w = width - pad_l - pad_r
+            plot_h = height - pad_t - pad_b
+            for t, score in scores:
+                x = pad_l + ((t - t_min) / (t_max - t_min)) * plot_w
+                y = pad_t + (100 - score) / 100 * plot_h
+                points.append(f"{x:.1f},{y:.1f}")
+            path = " ".join(points)
+            timeline_cards.append(f"""
+              <div class="timeline-card">
+                <div class="timeline-head">
+                  <strong>{html.escape(s)}</strong>
+                  <span>{stats.get(s, {}).get('final_score', 0):.0f}/100</span>
+                </div>
+                <svg viewBox="0 0 {width} {height}" role="img" aria-label="Attention timeline {html.escape(s)}">
+                  <line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + plot_h}" class="axis"/>
+                  <line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{pad_l + plot_w}" y2="{pad_t + plot_h}" class="axis"/>
+                  <line x1="{pad_l}" y1="{pad_t + plot_h * 0.4}" x2="{pad_l + plot_w}" y2="{pad_t + plot_h * 0.4}" class="guide"/>
+                  <line x1="{pad_l}" y1="{pad_t + plot_h * 0.6}" x2="{pad_l + plot_w}" y2="{pad_t + plot_h * 0.6}" class="guide"/>
+                  <text x="4" y="{pad_t + 4}" class="svg-label">100</text>
+                  <text x="9" y="{pad_t + plot_h + 4}" class="svg-label">0</text>
+                  <polyline points="{path}" class="score-line"/>
+                </svg>
+              </div>""")
+    timeline_html = "\n".join(timeline_cards) or '<p class="empty">Khong co du lieu attention timeline.</p>'
+
     legend_html = "".join(
         f'<span class="lg"><i style="background:{STATE_COLORS[s]}"></i>'
         f'{STATE_LABEL_VI[s]}</span>'
@@ -269,6 +342,23 @@ def render_html(students, bins, grid, score_grid, stats,
                              for f in st["flags"]) + "</div>")
         if st["phone"]:
             flags += '<div class="flags"><span class="flag phone">Phat hien dien thoai</span></div>'
+        impact_rows = "".join(
+            f'<div class="impact-row"><span>{STATE_LABEL_VI.get(row["state"], row["state"])}</span>'
+            f'<b>{row["seconds"]:.1f}s</b><b>{row["rate"]:+.1f}/s</b>'
+            f'<strong class="{("pos" if row["impact"] >= 0 else "neg")}">{row["impact"]:+.1f}</strong></div>'
+            for row in st["contributions"]
+        )
+        if not impact_rows:
+            impact_rows = '<div class="impact-row"><span>Khong co du lieu</span><b>0.0s</b><b>+0.0/s</b><strong>+0.0</strong></div>'
+        impact_total_class = "pos" if st["impact_total"] >= 0 else "neg"
+        impact_html = f"""
+          <div class="impact">
+            <div class="impact-title">
+              <span>Dong gop diem</span>
+              <strong class="{impact_total_class}">{st['impact_total']:+.1f}</strong>
+            </div>
+            {impact_rows}
+          </div>"""
         cards.append(f"""
         <div class="card">
           <div class="card-head">
@@ -282,6 +372,7 @@ def render_html(students, bins, grid, score_grid, stats,
             </div>
           </div>
           <div class="bars">{bars}</div>
+          {impact_html}
           {flags}
         </div>""")
     cards_html = "\n".join(cards)
@@ -297,27 +388,19 @@ def render_html(students, bins, grid, score_grid, stats,
     n_students = len(students)
     span = bins[-1] if bins else 0
 
-    return _HTML_TEMPLATE.format(
+    html_text = _HTML_TEMPLATE.format(
         source=html.escape(source_name),
         now=now,
         n_students=n_students,
         span=f"{span:.0f}",
         legend=legend_html,
         heatmap=heatmap_html,
+        timeline=timeline_html,
         png_block=png_block,
         cards=cards_html,
         n_cols=len(bins),
-    ).encode("utf-8").decode("utf-8") and _write(out_path, _HTML_TEMPLATE.format(
-        source=html.escape(source_name),
-        now=now,
-        n_students=n_students,
-        span=f"{span:.0f}",
-        legend=legend_html,
-        heatmap=heatmap_html,
-        png_block=png_block,
-        cards=cards_html,
-        n_cols=len(bins),
-    ))
+    )
+    return _write(out_path, html_text)
 
 
 def _write(path, text):
@@ -376,6 +459,20 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   .cell:hover {{ transform:scaleY(1.25); outline:1px solid #fff; }}
   .png-wrap {{ margin-top:16px; }}
   .png-wrap img {{ width:100%; border-radius:14px; border:1px solid var(--line); }}
+  .timeline-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+                    gap:14px; }}
+  .timeline-card {{ background:var(--panel); border:1px solid var(--line);
+                    border-radius:14px; padding:14px; }}
+  .timeline-head {{ display:flex; justify-content:space-between; align-items:center;
+                    color:var(--ink); font-size:13px; margin-bottom:8px; }}
+  .timeline-head span {{ color:var(--accent); font-weight:800; }}
+  .timeline-card svg {{ width:100%; height:auto; display:block; }}
+  .axis {{ stroke:#334155; stroke-width:1; }}
+  .guide {{ stroke:#1e293b; stroke-width:1; stroke-dasharray:4 4; }}
+  .svg-label {{ fill:#64748b; font-size:10px; }}
+  .score-line {{ fill:none; stroke:var(--accent); stroke-width:3;
+                 stroke-linecap:round; stroke-linejoin:round; }}
+  .empty {{ color:var(--mut); font-size:13px; }}
   .grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
            gap:16px; }}
   .card {{ background:var(--panel); border:1px solid var(--line);
@@ -395,6 +492,15 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   .bar-track {{ background:#1e293b; border-radius:99px; height:8px; overflow:hidden; }}
   .bar-fill {{ height:100%; border-radius:99px; }}
   .bar b {{ color:var(--ink); text-align:right; }}
+  .impact {{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }}
+  .impact-title {{ display:flex; justify-content:space-between; align-items:center;
+                   font-size:12px; color:var(--mut); margin-bottom:7px; }}
+  .impact-row {{ display:grid; grid-template-columns:96px 52px 58px 58px;
+                 align-items:center; gap:7px; font-size:11px; color:var(--mut);
+                 margin-bottom:5px; }}
+  .impact-row b, .impact-row strong {{ text-align:right; color:var(--ink); }}
+  .pos {{ color:#86efac !important; }}
+  .neg {{ color:#fca5a5 !important; }}
   .flags {{ margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }}
   .flag {{ background:rgba(245,158,11,.14); color:#fbbf24;
            border:1px solid rgba(245,158,11,.3); border-radius:8px;
@@ -427,6 +533,13 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
       {heatmap}
     </div>
     {png_block}
+  </section>
+
+  <section>
+    <h2>Attention score theo thoi gian</h2>
+    <div class="timeline-grid">
+      {timeline}
+    </div>
   </section>
 
   <section>

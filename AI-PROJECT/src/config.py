@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,6 +26,8 @@ CONFIG = {
     "video_sleep_duration": 3.5,
     "video_progressive_drowsiness_ear_threshold": 0.035,
     "video_use_pitch_distraction": True,
+    "video_absent_duration": 1.5,       # seconds missed before a track is declared ABSENT
+    "video_absent_track_keep_seconds": 8.0, # keep missing tracks long enough to log true absence
     "phone_detection_enabled": True,
     "phone_model_path": "yolov8n.pt",
     "phone_confidence": 0.35,
@@ -38,22 +42,22 @@ CONFIG = {
     "pitch_down_threshold": -25.0,
     "ear_threshold": 0.22,
     "sleep_duration": 3.0,
-    "mar_threshold": 0.60,              # MAR above this = mouth "open" (for transition counting)
-    "talk_duration": 2.0,                # seconds of sustained oscillation before flagging talking
+    "mar_threshold": 0.52,              # lower = more sensitive mouth-open transition detection
+    "talk_duration": 1.0,                # lower = talking is confirmed sooner
     "talk_window": 1.5,                  # rolling window (seconds) for oscillation analysis
-    "talk_min_transitions": 3,           # min closed→open transitions in window to detect speech
-    "talk_mar_variance_threshold": 0.005, # min MAR variance in window (alternative trigger)
+    "talk_min_transitions": 2,           # lower = fewer open/close cycles needed for speech
+    "talk_mar_variance_threshold": 0.003, # lower = subtler mouth motion can trigger speech
     "absent_duration": 3.0,
 
     "attention_alpha": 0.15,
     "attention_rates": {
-        "OK": 1.0,
-        "DISTRACTED": -2.0,
-        "TALKING": -3.0,
-        "SLEEPING": -5.0,
-        "ABSENT": -6.0,
-        "PHONE_USAGE": -4.0,
-        "BODY_ONLY": 0.0,
+        OK: 1.0,
+        DISTRACTED: -2.0,
+        TALKING: -3.0,
+        SLEEPING: -5.0,
+        ABSENT: -6.0,
+        PHONE_USAGE: -4.0,
+        BODY_ONLY: 0.0,
     },
 
     "buffer_seconds": 60.0,

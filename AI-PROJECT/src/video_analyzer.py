@@ -185,16 +185,20 @@ def assign_phones_to_people(person_bboxes, phone_detections):
     return owners
 
 
+def track_missing_seconds(track, dt):
+    return max(0.0, track.missed * dt)
+
+
 def smooth_distraction_state(raw_state, track_id, yaw, dt, distraction_scores):
-    if raw_state != "DISTRACTED":
-        if raw_state == "OK":
+    if raw_state != DISTRACTED:
+        if raw_state == OK:
             distraction_scores[track_id] = max(
                 0.0,
                 distraction_scores.get(track_id, 0.0)
                 - dt * CONFIG.get("video_distraction_fall_rate", 0.5),
             )
             if distraction_scores[track_id] >= CONFIG.get("video_distraction_enter_seconds", 0.2):
-                return "DISTRACTED"
+                return DISTRACTED
         else:
             distraction_scores[track_id] = 0.0
         return raw_state
@@ -205,10 +209,10 @@ def smooth_distraction_state(raw_state, track_id, yaw, dt, distraction_scores):
         + dt * CONFIG.get("video_distraction_rise_rate", 2.5),
     )
     if abs(yaw) >= CONFIG.get("video_yaw_threshold", 25.0) + CONFIG.get("video_strong_yaw_margin", 6.0):
-        return "DISTRACTED"
+        return DISTRACTED
     if distraction_scores[track_id] >= CONFIG.get("video_distraction_enter_seconds", 0.2):
-        return "DISTRACTED"
-    return "OK"
+        return DISTRACTED
+    return OK
 
 
 def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
@@ -227,6 +231,12 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 1280)
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 720)
     dt = 1.0 / max(fps, 1.0)
+    absent_duration = CONFIG.get("video_absent_duration", CONFIG.get("absent_duration", 1.5))
+    absent_keep_seconds = max(
+        absent_duration + 1.0,
+        CONFIG.get("video_absent_track_keep_seconds", absent_duration + 1.0),
+    )
+    max_missed_frames = max(1, int(fps * absent_keep_seconds))
 
     output_video = output_dir / f"{video_path.stem}_annotated.mp4"
     detail_csv = output_dir / f"{video_path.stem}_details.csv"
@@ -251,8 +261,8 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
         min_detection_confidence=CONFIG.get("video_face_detection_confidence", 0.5),
         min_tracking_confidence=CONFIG.get("video_face_detection_confidence", 0.5),
     )
-    face_tracker = CentroidTracker(max_distance=max(width, height) * 0.08, max_missed=int(fps * 2))
-    person_tracker = CentroidTracker(max_distance=max(width, height) * 0.12, max_missed=int(fps * 2))
+    face_tracker = CentroidTracker(max_distance=max(width, height) * 0.08, max_missed=max_missed_frames)
+    person_tracker = CentroidTracker(max_distance=max(width, height) * 0.12, max_missed=max_missed_frames)
     head_pose = HeadPoseEstimator()
     pitch_threshold = CONFIG["pitch_down_threshold"] if CONFIG.get("video_use_pitch_distraction", False) else -999.0
     classifier = StateClassifier(CONFIG.get("video_yaw_threshold", CONFIG["yaw_threshold"]), pitch_threshold)
@@ -504,6 +514,8 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
         for track_id, track in list(tracks.items()):
             if track_id in matched_track_ids or track_id not in students:
                 continue
+            if track_missing_seconds(track, dt) < absent_duration:
+                continue
             label = students[track_id].student_label
             record = {
                 "timestamp": timestamp,
@@ -548,7 +560,8 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     summary_fields = [
         "student", "total_seconds", "final_attention_score", "ok_seconds",
         "distracted_seconds", "sleeping_seconds", "talking_seconds",
-        "phone_usage_seconds", "body_only_seconds", "absent_seconds", "pattern_alerts",
+        "phone_usage_seconds", "body_only_seconds", "absent_seconds",
+        "score_impact", "pattern_alerts",
     ]
     write_csv(summary_csv, summary_rows, summary_fields)
 

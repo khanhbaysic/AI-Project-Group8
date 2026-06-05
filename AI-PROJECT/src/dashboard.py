@@ -2,16 +2,35 @@ from collections import deque
 from datetime import datetime
 
 import cv2
+import numpy as np
 
-from src.states import PHONE_USAGE, SLEEPING, TALKING
+from src.states import (
+    ALL_STATES,
+    LABEL_VI,
+    PHONE_USAGE,
+    SLEEPING,
+    STATE_COLORS,
+    TALKING,
+)
+
+
+def hex_to_bgr(hex_color):
+    value = hex_color.lstrip("#")
+    r = int(value[0:2], 16)
+    g = int(value[2:4], 16)
+    b = int(value[4:6], 16)
+    return b, g, r
+
+
+STATE_COLORS_BGR = {state: hex_to_bgr(color) for state, color in STATE_COLORS.items()}
 
 
 # Large on-screen alert messages for critical behavioral states.
 # Each entry: state -> (label, background_color, text_color)
 _STATE_ALERTS = {
-    SLEEPING:    ("SLEEPING DETECTED",       (0,  50, 200), (255, 255, 255)),
-    TALKING:     ("TALKING DETECTED",        (180, 100, 0), (255, 255, 255)),
-    PHONE_USAGE: ("PHONE USAGE DETECTED",    (180,   0, 180), (255, 255, 255)),
+    SLEEPING:    ("SLEEPING DETECTED",    STATE_COLORS_BGR[SLEEPING], (255, 255, 255)),
+    TALKING:     ("TALKING DETECTED",     STATE_COLORS_BGR[TALKING], (255, 255, 255)),
+    PHONE_USAGE: ("PHONE USAGE DETECTED", STATE_COLORS_BGR[PHONE_USAGE], (255, 255, 255)),
 }
 
 
@@ -52,6 +71,27 @@ class Dashboard:
             for p1, p2 in zip(pts, pts[1:]):
                 cv2.line(frame, p1, p2, score_color, 1)
 
+        state = record.get("state", "")
+        state_color = STATE_COLORS_BGR.get(state, (220, 220, 220))
+        cv2.rectangle(frame, (12, 180), (panel_w - 14, 222), state_color, -1)
+        cv2.putText(frame, "CURRENT STATE", (22, 196),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1)
+        cv2.putText(frame, state or "UNKNOWN", (22, 216),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 2)
+
+        legend_y = 242
+        cv2.putText(frame, "Legend", (12, legend_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, (230, 230, 230), 1)
+        for idx, state_name in enumerate(ALL_STATES):
+            col = idx % 2
+            row = idx // 2
+            x = 12 + col * 162
+            y0 = legend_y + 14 + row * 22
+            color = STATE_COLORS_BGR.get(state_name, (180, 180, 180))
+            cv2.rectangle(frame, (x, y0), (x + 12, y0 + 12), color, -1)
+            cv2.putText(frame, LABEL_VI.get(state_name, state_name), (x + 18, y0 + 11),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.38, (225, 225, 225), 1)
+
         metrics = [
             ("Student", record.get("student_id", "")),
             ("State", record.get("state", "")),
@@ -64,7 +104,7 @@ class Dashboard:
             ("MAR", f"{record.get('mar', 0):.3f}"),
             ("FPS", f"{record.get('fps', 0):.1f}"),
         ]
-        y = 200
+        y = 342
         for label, value in metrics:
             cv2.putText(frame, f"{label}: {value}", (12, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.50, (230, 230, 230), 1)
@@ -81,7 +121,6 @@ class Dashboard:
                 y += 20
 
         # --- prominent center-screen alert for SLEEPING / TALKING / PHONE ---
-        state = record.get("state", "")
         if state in _STATE_ALERTS:
             self._draw_alert_banner(frame, w, h, state)
 
@@ -125,8 +164,7 @@ class Dashboard:
             (icon_x + tri_size, icon_cy - tri_size),
             (icon_x + 2 * tri_size, icon_cy + tri_size),
         ]
-        cv2.polylines(frame, [__import__("numpy").array(pts_tri)], True,
-                       text_color, 2, cv2.LINE_AA)
+        cv2.polylines(frame, [np.array(pts_tri)], True, text_color, 2, cv2.LINE_AA)
         cv2.putText(frame, "!", (icon_x + tri_size - 4, icon_cy + tri_size - 5),
                     font, 0.55, text_color, 2, cv2.LINE_AA)
 

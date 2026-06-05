@@ -21,9 +21,10 @@ from src.liveness_detector import LivenessDetector
 from src.mouth_monitor import MouthMonitor
 from src.phone_detector import PhoneDetector, expanded_intersection
 from src.state_classifier import StateClassifier
+from src.states import ABSENT, OK, PHONE_USAGE
 
 
-def build_default_record(student_id, state="ABSENT"):
+def build_default_record(student_id, state=ABSENT):
     return {
         "timestamp": time.time(),
         "student_id": student_id,
@@ -145,7 +146,7 @@ def run():
         record["fps"] = fps
 
         if detection.face_count == 0:
-            state = "ABSENT"
+            state = ABSENT
             liveness_status = "NO_FACE"
             identity_status = identity_load_status if identity_load_status != "READY" else "NO_FACE"
             phone_started_at = None
@@ -181,7 +182,7 @@ def run():
                     if phone_started_at is None:
                         phone_started_at = now
                     if (now - phone_started_at) >= CONFIG.get("video_phone_duration", 0.5):
-                        state = "PHONE_USAGE"
+                        state = PHONE_USAGE
                 else:
                     phone_started_at = None
 
@@ -198,7 +199,7 @@ def run():
             })
 
             for x, y, w, h in detection.faces:
-                color = (0, 220, 80) if state == "OK" else (0, 0, 255)
+                color = (0, 220, 80) if state == OK else (0, 0, 255)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 
         for phone in phone_detections:
@@ -221,7 +222,7 @@ def run():
             "pitch": record["pitch"],
             "roll": record.get("roll", 0.0),
             "attention_score": record["attention_score"],
-            "phone_detected": state == "PHONE_USAGE",
+            "phone_detected": state == PHONE_USAGE,
             "patterns": "; ".join(active_patterns),
         })
 

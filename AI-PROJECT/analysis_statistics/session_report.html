@@ -45,6 +45,20 @@
   .cell:hover { transform:scaleY(1.25); outline:1px solid #fff; }
   .png-wrap { margin-top:16px; }
   .png-wrap img { width:100%; border-radius:14px; border:1px solid var(--line); }
+  .timeline-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+                    gap:14px; }
+  .timeline-card { background:var(--panel); border:1px solid var(--line);
+                    border-radius:14px; padding:14px; }
+  .timeline-head { display:flex; justify-content:space-between; align-items:center;
+                    color:var(--ink); font-size:13px; margin-bottom:8px; }
+  .timeline-head span { color:var(--accent); font-weight:800; }
+  .timeline-card svg { width:100%; height:auto; display:block; }
+  .axis { stroke:#334155; stroke-width:1; }
+  .guide { stroke:#1e293b; stroke-width:1; stroke-dasharray:4 4; }
+  .svg-label { fill:#64748b; font-size:10px; }
+  .score-line { fill:none; stroke:var(--accent); stroke-width:3;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  .empty { color:var(--mut); font-size:13px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
            gap:16px; }
   .card { background:var(--panel); border:1px solid var(--line);
@@ -64,6 +78,15 @@
   .bar-track { background:#1e293b; border-radius:99px; height:8px; overflow:hidden; }
   .bar-fill { height:100%; border-radius:99px; }
   .bar b { color:var(--ink); text-align:right; }
+  .impact { margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .impact-title { display:flex; justify-content:space-between; align-items:center;
+                   font-size:12px; color:var(--mut); margin-bottom:7px; }
+  .impact-row { display:grid; grid-template-columns:96px 52px 58px 58px;
+                 align-items:center; gap:7px; font-size:11px; color:var(--mut);
+                 margin-bottom:5px; }
+  .impact-row b, .impact-row strong { text-align:right; color:var(--ink); }
+  .pos { color:#86efac !important; }
+  .neg { color:#fca5a5 !important; }
   .flags { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
   .flag { background:rgba(245,158,11,.14); color:#fbbf24;
            border:1px solid rgba(245,158,11,.3); border-radius:8px;
@@ -81,11 +104,11 @@
 <div class="wrap">
   <span class="badge">&#128274; Privacy-First &middot; Khong luu anh khuon mat</span>
   <h1>Bao cao phien giam sat lop hoc</h1>
-  <p class="sub">Nguon du lieu: session_20260603_155111_details.csv &middot; Tao luc 03/06/2026 15:51</p>
+  <p class="sub">Nguon du lieu: session_20260604_114120_details.csv &middot; Tao luc 04/06/2026 11:41</p>
 
   <div class="meta">
     <div><b>1</b><span>Sinh vien duoc theo doi</span></div>
-    <div><b>143s</b><span>Thoi luong phan tich</span></div>
+    <div><b>116s</b><span>Thoi luong phan tich</span></div>
     <div><b>0</b><span>Anh khuon mat luu tru</span></div>
   </div>
 
@@ -93,9 +116,31 @@
     <h2>Heatmap chu y ca lop theo thoi gian</h2>
     <div class="legend"><span class="lg"><i style="background:#22c55e"></i>Tap trung</span><span class="lg"><i style="background:#94a3b8"></i>Khong ro mat</span><span class="lg"><i style="background:#f59e0b"></i>Mat tap trung</span><span class="lg"><i style="background:#a855f7"></i>Noi chuyen</span><span class="lg"><i style="background:#ef4444"></i>Dung dien thoai</span><span class="lg"><i style="background:#3b82f6"></i>Ngu gat</span><span class="lg"><i style="background:#1e293b"></i>Vang mat</span></div>
     <div class="hm">
-      <div class="hm-row"><div class="hm-label">202417140<span class="hm-score">7</span></div><div class="hm-track"><div class="cell" style="background:#22c55e" title="202417140 | 1.5s | Tap trung"></div><div class="cell" style="background:#1e293b" title="202417140 | 3.9s | Vang mat"></div><div class="cell" style="background:#22c55e" title="202417140 | 6.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 8.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 11.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 13.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 15.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 18.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 20.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 23.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 25.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 27.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 30.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 32.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 35.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 37.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 40.0s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 42.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 44.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 47.2s | Tap trung"></div><div class="cell" style="background:#ef4444" title="202417140 | 49.6s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="202417140 | 52.0s | Dung dien thoai"></div><div class="cell" style="background:#22c55e" title="202417140 | 54.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 56.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 59.2s | Tap trung"></div><div class="cell" style="background:#ef4444" title="202417140 | 61.6s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="202417140 | 64.0s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="202417140 | 66.5s | Dung dien thoai"></div><div class="cell" style="background:#3b82f6" title="202417140 | 68.9s | Ngu gat"></div><div class="cell" style="background:#ef4444" title="202417140 | 71.3s | Dung dien thoai"></div><div class="cell" style="background:#22c55e" title="202417140 | 73.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 76.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 78.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 80.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 83.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 85.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 88.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 90.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 92.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 95.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 97.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 100.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 102.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 105.0s | Tap trung"></div><div class="cell" style="background:#1e293b" title="202417140 | 107.4s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 109.8s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 112.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 114.6s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 117.0s | Vang mat"></div><div class="cell" style="background:#f59e0b" title="202417140 | 119.4s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 121.8s | Mat tap trung"></div><div class="cell" style="background:#1e293b" title="202417140 | 124.2s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 126.6s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 129.0s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 131.5s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 133.9s | Vang mat"></div><div class="cell" style="background:#1e293b" title="202417140 | 136.3s | Vang mat"></div><div class="cell" style="background:#22c55e" title="202417140 | 138.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 141.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 143.5s | Tap trung"></div></div></div>
+      <div class="hm-row"><div class="hm-label">202417140<span class="hm-score">92</span></div><div class="hm-track"><div class="cell" style="background:#22c55e" title="202417140 | 1.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 3.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 5.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 7.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 9.3s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 11.3s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 13.2s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 15.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 17.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 19.0s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 21.0s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 22.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 24.9s | Tap trung"></div><div class="cell" style="background:#ef4444" title="202417140 | 26.8s | Dung dien thoai"></div><div class="cell" style="background:#22c55e" title="202417140 | 28.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 30.7s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 32.6s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 34.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 36.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 38.4s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 40.4s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 42.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 44.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 46.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 48.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 50.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 52.0s | Tap trung"></div><div class="cell" style="background:#3b82f6" title="202417140 | 54.0s | Ngu gat"></div><div class="cell" style="background:#22c55e" title="202417140 | 55.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 57.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 59.8s | Tap trung"></div><div class="cell" style="background:#ef4444" title="202417140 | 61.8s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="202417140 | 63.7s | Dung dien thoai"></div><div class="cell" style="background:#22c55e" title="202417140 | 65.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 67.6s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 69.5s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 71.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 73.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 75.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 77.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 79.2s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 81.2s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 83.1s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 85.1s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 87.0s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 89.0s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 90.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 92.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 94.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 96.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 98.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 100.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 102.6s | Tap trung"></div><div class="cell" style="background:#a855f7" title="202417140 | 104.5s | Noi chuyen"></div><div class="cell" style="background:#22c55e" title="202417140 | 106.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 108.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 110.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 112.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 114.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 116.2s | Tap trung"></div></div></div>
     </div>
     <div class="png-wrap"><img src="class_attention_heatmap.png" alt="Heatmap chu y ca lop"></div>
+  </section>
+
+  <section>
+    <h2>Attention score theo thoi gian</h2>
+    <div class="timeline-grid">
+      
+              <div class="timeline-card">
+                <div class="timeline-head">
+                  <strong>202417140</strong>
+                  <span>92/100</span>
+                </div>
+                <svg viewBox="0 0 620 118" role="img" aria-label="Attention timeline 202417140">
+                  <line x1="34" y1="12" x2="34" y2="94" class="axis"/>
+                  <line x1="34" y1="94" x2="608" y2="94" class="axis"/>
+                  <line x1="34" y1="44.800000000000004" x2="608" y2="44.800000000000004" class="guide"/>
+                  <line x1="34" y1="61.199999999999996" x2="608" y2="61.199999999999996" class="guide"/>
+                  <text x="4" y="16" class="svg-label">100</text>
+                  <text x="9" y="98" class="svg-label">0</text>
+                  <polyline points="34.0,12.0 43.7,12.0 53.5,12.0 63.2,12.1 72.9,12.2 82.6,14.2 92.4,16.5 102.1,16.9 111.8,15.9 121.6,14.8 131.3,19.0 141.0,19.3 150.7,17.9 160.5,20.2 170.2,20.8 179.9,19.2 189.7,18.5 199.4,18.7 209.1,17.2 218.8,15.5 228.6,15.1 238.3,17.4 248.0,17.3 257.8,15.9 267.5,14.6 277.2,13.9 286.9,13.3 296.7,13.5 306.4,16.2 316.1,16.4 325.9,14.8 335.6,15.1 345.3,20.0 355.1,22.4 364.8,21.6 374.5,20.9 384.2,21.3 394.0,19.7 403.7,18.1 413.4,18.1 423.2,17.3 432.9,17.9 442.6,19.1 452.3,19.1 462.1,22.1 471.8,25.2 481.5,27.9 491.3,27.6 501.0,26.6 510.7,25.0 520.4,23.6 530.2,23.2 539.9,21.6 549.6,23.0 559.4,25.1 569.1,24.2 578.8,22.7 588.5,21.1 598.3,19.7 608.0,19.5" class="score-line"/>
+                </svg>
+              </div>
+    </div>
   </section>
 
   <section>
@@ -104,17 +149,25 @@
       
         <div class="card">
           <div class="card-head">
-            <div class="ring" style="--c:#ef4444;--p:7">
-              <span>7</span>
+            <div class="ring" style="--c:#22c55e;--p:92">
+              <span>92</span>
             </div>
             <div>
               <h3>202417140</h3>
-              <p>144.5s &middot; chu y TB 63
-                 &middot; tap trung 66%</p>
+              <p>116.6s &middot; chu y TB 92
+                 &middot; tap trung 73%</p>
             </div>
           </div>
-          <div class="bars"><div class="bar"><span>Tap trung</span><div class="bar-track"><div class="bar-fill" style="width:66%;background:#22c55e"></div></div><b>66%</b></div><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:21%;background:#1e293b"></div></div><b>21%</b></div><div class="bar"><span>Dung dien thoai</span><div class="bar-track"><div class="bar-fill" style="width:8%;background:#ef4444"></div></div><b>8%</b></div><div class="bar"><span>Ngu gat</span><div class="bar-track"><div class="bar-fill" style="width:3%;background:#3b82f6"></div></div><b>3%</b></div><div class="bar"><span>Mat tap trung</span><div class="bar-track"><div class="bar-fill" style="width:2%;background:#f59e0b"></div></div><b>2%</b></div><div class="bar"><span>Noi chuyen</span><div class="bar-track"><div class="bar-fill" style="width:1%;background:#a855f7"></div></div><b>1%</b></div></div>
-          <div class="flags"><span class="flag">Frequent Distraction</span><span class="flag">Frequent Distraction; Rapid Attention Drop</span><span class="flag">Rapid Attention Drop</span></div><div class="flags"><span class="flag phone">Phat hien dien thoai</span></div>
+          <div class="bars"><div class="bar"><span>Tap trung</span><div class="bar-track"><div class="bar-fill" style="width:73%;background:#22c55e"></div></div><b>73%</b></div><div class="bar"><span>Mat tap trung</span><div class="bar-track"><div class="bar-fill" style="width:18%;background:#f59e0b"></div></div><b>18%</b></div><div class="bar"><span>Dung dien thoai</span><div class="bar-track"><div class="bar-fill" style="width:4%;background:#ef4444"></div></div><b>4%</b></div><div class="bar"><span>Ngu gat</span><div class="bar-track"><div class="bar-fill" style="width:3%;background:#3b82f6"></div></div><b>3%</b></div><div class="bar"><span>Noi chuyen</span><div class="bar-track"><div class="bar-fill" style="width:3%;background:#a855f7"></div></div><b>3%</b></div><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:0%;background:#1e293b"></div></div><b>0%</b></div></div>
+          
+          <div class="impact">
+            <div class="impact-title">
+              <span>Dong gop diem</span>
+              <strong class="neg">-1.6</strong>
+            </div>
+            <div class="impact-row"><span>Tap trung</span><b>84.8s</b><b>+1.0/s</b><strong class="pos">+84.8</strong></div><div class="impact-row"><span>Mat tap trung</span><b>20.6s</b><b>-2.0/s</b><strong class="neg">-41.3</strong></div><div class="impact-row"><span>Noi chuyen</span><b>2.9s</b><b>-3.0/s</b><strong class="neg">-8.8</strong></div><div class="impact-row"><span>Dung dien thoai</span><b>4.6s</b><b>-4.0/s</b><strong class="neg">-18.6</strong></div><div class="impact-row"><span>Ngu gat</span><b>3.5s</b><b>-5.0/s</b><strong class="neg">-17.4</strong></div><div class="impact-row"><span>Vang mat</span><b>0.0s</b><b>-6.0/s</b><strong class="neg">-0.3</strong></div>
+          </div>
+          <div class="flags"><span class="flag">Frequent Distraction</span><span class="flag">Frequent Distraction; Sustained Distraction</span></div><div class="flags"><span class="flag phone">Phat hien dien thoai</span></div>
         </div>
     </div>
   </section>

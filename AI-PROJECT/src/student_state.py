@@ -42,8 +42,27 @@ class StudentState:
         self.last_record = record.copy()
         return display_score, patterns
 
+    def state_contributions(self):
+        """Return per-state duration and approximate score impact.
+
+        The impact is computed as ``seconds * rate`` using the same rate table
+        as the attention scorer. It is an explanation aid for the report, not a
+        second scoring system.
+        """
+        rows = []
+        for state, seconds in sorted(self.state_durations.items()):
+            rate = self.attention.rates.get(state, 0.0)
+            rows.append({
+                "state": state,
+                "seconds": round(seconds, 2),
+                "rate": rate,
+                "impact": round(seconds * rate, 2),
+            })
+        return rows
+
     def summary(self):
         total = sum(self.state_durations.values())
+        contributions = self.state_contributions()
         return {
             "student": self.student_label,
             "total_seconds": round(total, 2),
@@ -55,5 +74,9 @@ class StudentState:
             "phone_usage_seconds": round(self.state_durations[PHONE_USAGE], 2),
             "body_only_seconds": round(self.state_durations[BODY_ONLY], 2),
             "absent_seconds": round(self.state_durations[ABSENT], 2),
+            "score_impact": "; ".join(
+                f"{row['state']}:{row['impact']:+.2f}"
+                for row in contributions
+            ),
             "pattern_alerts": "; ".join(f"{k}:{v}" for k, v in sorted(self.alert_counts.items())),
         }
