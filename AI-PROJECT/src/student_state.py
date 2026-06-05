@@ -5,13 +5,19 @@ from src.behavior_analyzer.pattern_detector import PatternDetector
 from src.behavior_analyzer.temporal_buffer import TemporalBuffer
 from src.eye_monitor import EyeMonitor
 from src.mouth_monitor import MouthMonitor
+from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
 
 
 class StudentState:
     def __init__(self, student_label, config):
         self.student_label = student_label
         self.eye_monitor = EyeMonitor(config["ear_threshold"], config["sleep_duration"])
-        self.mouth_monitor = MouthMonitor(config["mar_threshold"], config["talk_duration"])
+        self.mouth_monitor = MouthMonitor(
+            config["mar_threshold"], config["talk_duration"],
+            talk_window=config.get("talk_window", 1.5),
+            talk_min_transitions=config.get("talk_min_transitions", 3),
+            talk_mar_variance_threshold=config.get("talk_mar_variance_threshold", 0.005),
+        )
         self.attention = AttentionScorer(config["attention_rates"], config["attention_alpha"])
         self.buffer = TemporalBuffer(config["buffer_seconds"])
         self.pattern_detector = PatternDetector(
@@ -36,18 +42,41 @@ class StudentState:
         self.last_record = record.copy()
         return display_score, patterns
 
+    def state_contributions(self):
+        """Return per-state duration and approximate score impact.
+
+        The impact is computed as ``seconds * rate`` using the same rate table
+        as the attention scorer. It is an explanation aid for the report, not a
+        second scoring system.
+        """
+        rows = []
+        for state, seconds in sorted(self.state_durations.items()):
+            rate = self.attention.rates.get(state, 0.0)
+            rows.append({
+                "state": state,
+                "seconds": round(seconds, 2),
+                "rate": rate,
+                "impact": round(seconds * rate, 2),
+            })
+        return rows
+
     def summary(self):
         total = sum(self.state_durations.values())
+        contributions = self.state_contributions()
         return {
             "student": self.student_label,
             "total_seconds": round(total, 2),
             "final_attention_score": round(self.attention.display_score, 2),
-            "ok_seconds": round(self.state_durations["OK"], 2),
-            "distracted_seconds": round(self.state_durations["DISTRACTED"], 2),
-            "sleeping_seconds": round(self.state_durations["SLEEPING"], 2),
-            "talking_seconds": round(self.state_durations["TALKING"], 2),
-            "phone_usage_seconds": round(self.state_durations["PHONE_USAGE"], 2),
-            "body_only_seconds": round(self.state_durations["BODY_ONLY"], 2),
-            "absent_seconds": round(self.state_durations["ABSENT"], 2),
+            "ok_seconds": round(self.state_durations[OK], 2),
+            "distracted_seconds": round(self.state_durations[DISTRACTED], 2),
+            "sleeping_seconds": round(self.state_durations[SLEEPING], 2),
+            "talking_seconds": round(self.state_durations[TALKING], 2),
+            "phone_usage_seconds": round(self.state_durations[PHONE_USAGE], 2),
+            "body_only_seconds": round(self.state_durations[BODY_ONLY], 2),
+            "absent_seconds": round(self.state_durations[ABSENT], 2),
+            "score_impact": "; ".join(
+                f"{row['state']}:{row['impact']:+.2f}"
+                for row in contributions
+            ),
             "pattern_alerts": "; ".join(f"{k}:{v}" for k, v in sorted(self.alert_counts.items())),
         }

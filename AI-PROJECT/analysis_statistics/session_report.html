@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bao cao phien giam sat - Privacy First</title>
+<style>
+  :root { --bg:#0b1220; --panel:#0f1a2e; --line:#1e293b; --ink:#e2e8f0;
+           --mut:#94a3b8; --accent:#38bdf8; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink);
+          font-family:"Segoe UI",system-ui,sans-serif; line-height:1.55;
+          padding:32px 18px 64px; }
+  .wrap { max-width:1040px; margin:0 auto; }
+  .badge { display:inline-flex; align-items:center; gap:8px;
+            background:rgba(56,189,248,.12); color:var(--accent);
+            border:1px solid rgba(56,189,248,.35); padding:6px 12px;
+            border-radius:999px; font-size:12px; font-weight:600;
+            letter-spacing:.04em; text-transform:uppercase; }
+  h1 { font-size:30px; margin:14px 0 4px; letter-spacing:-.02em; }
+  .sub { color:var(--mut); font-size:14px; }
+  .meta { display:flex; gap:24px; flex-wrap:wrap; margin:22px 0 8px; }
+  .meta div { background:var(--panel); border:1px solid var(--line);
+               border-radius:12px; padding:12px 16px; min-width:120px; }
+  .meta b { display:block; font-size:24px; color:#fff; }
+  .meta span { font-size:12px; color:var(--mut); }
+  section { margin-top:38px; }
+  h2 { font-size:18px; margin-bottom:14px; display:flex; align-items:center;
+        gap:10px; }
+  h2::before { content:""; width:4px; height:18px; background:var(--accent);
+                border-radius:2px; }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin:6px 0 16px;
+             font-size:12px; color:var(--mut); }
+  .lg { display:inline-flex; align-items:center; gap:6px; }
+  .lg i { width:13px; height:13px; border-radius:3px; display:inline-block; }
+  .hm { background:var(--panel); border:1px solid var(--line);
+         border-radius:14px; padding:16px; overflow-x:auto; }
+  .hm-row { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .hm-label { width:120px; flex:none; font-size:13px; display:flex;
+               justify-content:space-between; padding-right:8px; }
+  .hm-score { color:var(--accent); font-weight:700; }
+  .hm-track { display:grid; gap:2px; flex:1;
+               grid-template-columns:repeat(60,1fr); }
+  .cell { height:22px; border-radius:2px; transition:transform .1s; }
+  .cell:hover { transform:scaleY(1.25); outline:1px solid #fff; }
+  .png-wrap { margin-top:16px; }
+  .png-wrap img { width:100%; border-radius:14px; border:1px solid var(--line); }
+  .timeline-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+                    gap:14px; }
+  .timeline-card { background:var(--panel); border:1px solid var(--line);
+                    border-radius:14px; padding:14px; }
+  .timeline-head { display:flex; justify-content:space-between; align-items:center;
+                    color:var(--ink); font-size:13px; margin-bottom:8px; }
+  .timeline-head span { color:var(--accent); font-weight:800; }
+  .timeline-card svg { width:100%; height:auto; display:block; }
+  .axis { stroke:#334155; stroke-width:1; }
+  .guide { stroke:#1e293b; stroke-width:1; stroke-dasharray:4 4; }
+  .svg-label { fill:#64748b; font-size:10px; }
+  .score-line { fill:none; stroke:var(--accent); stroke-width:3;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  .empty { color:var(--mut); font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+           gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line);
+           border-radius:16px; padding:18px; }
+  .card-head { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .card h3 { font-size:16px; }
+  .card p { font-size:12px; color:var(--mut); }
+  .ring { --p:0; width:62px; height:62px; flex:none; border-radius:50%;
+           display:grid; place-items:center; font-weight:800; font-size:18px;
+           color:#fff;
+           background:conic-gradient(var(--c) calc(var(--p)*1%),
+                      #1e293b 0); }
+  .ring span { width:46px; height:46px; border-radius:50%; background:var(--panel);
+                display:grid; place-items:center; }
+  .bar { display:grid; grid-template-columns:96px 1fr 38px; align-items:center;
+          gap:8px; font-size:11px; color:var(--mut); margin-bottom:5px; }
+  .bar-track { background:#1e293b; border-radius:99px; height:8px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:99px; }
+  .bar b { color:var(--ink); text-align:right; }
+  .impact { margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .impact-title { display:flex; justify-content:space-between; align-items:center;
+                   font-size:12px; color:var(--mut); margin-bottom:7px; }
+  .impact-row { display:grid; grid-template-columns:96px 52px 58px 58px;
+                 align-items:center; gap:7px; font-size:11px; color:var(--mut);
+                 margin-bottom:5px; }
+  .impact-row b, .impact-row strong { text-align:right; color:var(--ink); }
+  .pos { color:#86efac !important; }
+  .neg { color:#fca5a5 !important; }
+  .flags { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+  .flag { background:rgba(245,158,11,.14); color:#fbbf24;
+           border:1px solid rgba(245,158,11,.3); border-radius:8px;
+           padding:3px 9px; font-size:11px; }
+  .flag.phone { background:rgba(239,68,68,.14); color:#f87171;
+                 border-color:rgba(239,68,68,.3); }
+  .note { margin-top:40px; background:rgba(34,197,94,.07);
+           border:1px solid rgba(34,197,94,.25); border-radius:14px;
+           padding:18px 20px; font-size:13px; color:#bbf7d0; }
+  .note b { color:#86efac; }
+  footer { margin-top:36px; text-align:center; color:#475569; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">&#128274; Privacy-First &middot; Khong luu anh khuon mat</span>
+  <h1>Bao cao phien giam sat lop hoc</h1>
+  <p class="sub">Nguon du lieu: session_20260604_114120_details.csv &middot; Tao luc 04/06/2026 11:41</p>
+
+  <div class="meta">
+    <div><b>1</b><span>Sinh vien duoc theo doi</span></div>
+    <div><b>116s</b><span>Thoi luong phan tich</span></div>
+    <div><b>0</b><span>Anh khuon mat luu tru</span></div>
+  </div>
+
+  <section>
+    <h2>Heatmap chu y ca lop theo thoi gian</h2>
+    <div class="legend"><span class="lg"><i style="background:#22c55e"></i>Tap trung</span><span class="lg"><i style="background:#94a3b8"></i>Khong ro mat</span><span class="lg"><i style="background:#f59e0b"></i>Mat tap trung</span><span class="lg"><i style="background:#a855f7"></i>Noi chuyen</span><span class="lg"><i style="background:#ef4444"></i>Dung dien thoai</span><span class="lg"><i style="background:#3b82f6"></i>Ngu gat</span><span class="lg"><i style="background:#1e293b"></i>Vang mat</span></div>
+    <div class="hm">
+      <div class="hm-row"><div class="hm-label">202417140<span class="hm-score">92</span></div><div class="hm-track"><div class="cell" style="background:#22c55e" title="202417140 | 1.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 3.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 5.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 7.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 9.3s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 11.3s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 13.2s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 15.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 17.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 19.0s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 21.0s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 22.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 24.9s | Tap trung"></div><div class="cell" style="background:#ef4444" title="202417140 | 26.8s | Dung dien thoai"></div><div class="cell" style="background:#22c55e" title="202417140 | 28.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 30.7s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 32.6s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 34.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 36.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 38.4s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 40.4s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 42.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 44.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 46.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 48.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 50.1s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 52.0s | Tap trung"></div><div class="cell" style="background:#3b82f6" title="202417140 | 54.0s | Ngu gat"></div><div class="cell" style="background:#22c55e" title="202417140 | 55.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 57.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 59.8s | Tap trung"></div><div class="cell" style="background:#ef4444" title="202417140 | 61.8s | Dung dien thoai"></div><div class="cell" style="background:#ef4444" title="202417140 | 63.7s | Dung dien thoai"></div><div class="cell" style="background:#22c55e" title="202417140 | 65.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 67.6s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 69.5s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 71.5s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 73.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 75.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 77.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 79.2s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 81.2s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 83.1s | Tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 85.1s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 87.0s | Mat tap trung"></div><div class="cell" style="background:#f59e0b" title="202417140 | 89.0s | Mat tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 90.9s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 92.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 94.8s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 96.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 98.7s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 100.6s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 102.6s | Tap trung"></div><div class="cell" style="background:#a855f7" title="202417140 | 104.5s | Noi chuyen"></div><div class="cell" style="background:#22c55e" title="202417140 | 106.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 108.4s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 110.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 112.3s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 114.2s | Tap trung"></div><div class="cell" style="background:#22c55e" title="202417140 | 116.2s | Tap trung"></div></div></div>
+    </div>
+    <div class="png-wrap"><img src="class_attention_heatmap.png" alt="Heatmap chu y ca lop"></div>
+  </section>
+
+  <section>
+    <h2>Attention score theo thoi gian</h2>
+    <div class="timeline-grid">
+      
+              <div class="timeline-card">
+                <div class="timeline-head">
+                  <strong>202417140</strong>
+                  <span>92/100</span>
+                </div>
+                <svg viewBox="0 0 620 118" role="img" aria-label="Attention timeline 202417140">
+                  <line x1="34" y1="12" x2="34" y2="94" class="axis"/>
+                  <line x1="34" y1="94" x2="608" y2="94" class="axis"/>
+                  <line x1="34" y1="44.800000000000004" x2="608" y2="44.800000000000004" class="guide"/>
+                  <line x1="34" y1="61.199999999999996" x2="608" y2="61.199999999999996" class="guide"/>
+                  <text x="4" y="16" class="svg-label">100</text>
+                  <text x="9" y="98" class="svg-label">0</text>
+                  <polyline points="34.0,12.0 43.7,12.0 53.5,12.0 63.2,12.1 72.9,12.2 82.6,14.2 92.4,16.5 102.1,16.9 111.8,15.9 121.6,14.8 131.3,19.0 141.0,19.3 150.7,17.9 160.5,20.2 170.2,20.8 179.9,19.2 189.7,18.5 199.4,18.7 209.1,17.2 218.8,15.5 228.6,15.1 238.3,17.4 248.0,17.3 257.8,15.9 267.5,14.6 277.2,13.9 286.9,13.3 296.7,13.5 306.4,16.2 316.1,16.4 325.9,14.8 335.6,15.1 345.3,20.0 355.1,22.4 364.8,21.6 374.5,20.9 384.2,21.3 394.0,19.7 403.7,18.1 413.4,18.1 423.2,17.3 432.9,17.9 442.6,19.1 452.3,19.1 462.1,22.1 471.8,25.2 481.5,27.9 491.3,27.6 501.0,26.6 510.7,25.0 520.4,23.6 530.2,23.2 539.9,21.6 549.6,23.0 559.4,25.1 569.1,24.2 578.8,22.7 588.5,21.1 598.3,19.7 608.0,19.5" class="score-line"/>
+                </svg>
+              </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Phan tich tung sinh vien</h2>
+    <div class="grid">
+      
+        <div class="card">
+          <div class="card-head">
+            <div class="ring" style="--c:#22c55e;--p:92">
+              <span>92</span>
+            </div>
+            <div>
+              <h3>202417140</h3>
+              <p>116.6s &middot; chu y TB 92
+                 &middot; tap trung 73%</p>
+            </div>
+          </div>
+          <div class="bars"><div class="bar"><span>Tap trung</span><div class="bar-track"><div class="bar-fill" style="width:73%;background:#22c55e"></div></div><b>73%</b></div><div class="bar"><span>Mat tap trung</span><div class="bar-track"><div class="bar-fill" style="width:18%;background:#f59e0b"></div></div><b>18%</b></div><div class="bar"><span>Dung dien thoai</span><div class="bar-track"><div class="bar-fill" style="width:4%;background:#ef4444"></div></div><b>4%</b></div><div class="bar"><span>Ngu gat</span><div class="bar-track"><div class="bar-fill" style="width:3%;background:#3b82f6"></div></div><b>3%</b></div><div class="bar"><span>Noi chuyen</span><div class="bar-track"><div class="bar-fill" style="width:3%;background:#a855f7"></div></div><b>3%</b></div><div class="bar"><span>Vang mat</span><div class="bar-track"><div class="bar-fill" style="width:0%;background:#1e293b"></div></div><b>0%</b></div></div>
+          
+          <div class="impact">
+            <div class="impact-title">
+              <span>Dong gop diem</span>
+              <strong class="neg">-1.6</strong>
+            </div>
+            <div class="impact-row"><span>Tap trung</span><b>84.8s</b><b>+1.0/s</b><strong class="pos">+84.8</strong></div><div class="impact-row"><span>Mat tap trung</span><b>20.6s</b><b>-2.0/s</b><strong class="neg">-41.3</strong></div><div class="impact-row"><span>Noi chuyen</span><b>2.9s</b><b>-3.0/s</b><strong class="neg">-8.8</strong></div><div class="impact-row"><span>Dung dien thoai</span><b>4.6s</b><b>-4.0/s</b><strong class="neg">-18.6</strong></div><div class="impact-row"><span>Ngu gat</span><b>3.5s</b><b>-5.0/s</b><strong class="neg">-17.4</strong></div><div class="impact-row"><span>Vang mat</span><b>0.0s</b><b>-6.0/s</b><strong class="neg">-0.3</strong></div>
+          </div>
+          <div class="flags"><span class="flag">Frequent Distraction</span><span class="flag">Frequent Distraction; Sustained Distraction</span></div><div class="flags"><span class="flag phone">Phat hien dien thoai</span></div>
+        </div>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>Nguyen tac Privacy-First:</b> Bao cao nay duoc tao hoan toan tu du lieu
+    hinh hoc (goc dau Yaw/Pitch, ti le mat EAR, ti le mieng MAR, trang thai
+    hanh vi). KHONG co khung hinh goc hay anh khuon mat nao duoc luu lam bang
+    chung. Giao vien van nam duoc ai mat tap trung vao luc nao, nhung danh tinh
+    truc quan cua sinh vien khong bi luu tru &mdash; giam thieu rui ro lo lot
+    du lieu sinh trac hoc.
+  </div>
+
+  <footer>E-Proctoring System &middot; Nhom 8 &middot; Module phan tich hau-buoi-hoc</footer>
+</div>
+</body>
+</html>

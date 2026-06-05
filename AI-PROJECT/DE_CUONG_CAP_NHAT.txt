@@ -7,6 +7,8 @@
 
 Xây dựng hệ thống giám thị ảo (E-Proctoring) hỗ trợ giám sát học sinh/sinh viên trong giờ học trực tuyến bằng cách **phân tích hành vi khuôn mặt** (Facial Behavior Analysis) để phát hiện các dấu hiệu mất tập trung, làm việc riêng hoặc gian lận.
 
+Đây là hệ thống **rule-based** (dựa trên ngưỡng), **không huấn luyện model riêng**. File `yolov8n.pt` là model YOLO pre-trained sẵn trên COCO, chỉ dùng để phát hiện `person` và `cell phone`.
+
 ---
 
 ## 2. Bài toán (Problem Statement)
@@ -32,36 +34,41 @@ Tạo ra hệ thống có khả năng:
 ## 3. Inputs (Đầu vào)
 
 - **Luồng video liên tục** từ webcam của sinh viên trong suốt buổi học
-- **File cấu hình** ngưỡng cảnh báo (có thể tùy chỉnh theo từng buổi học)
+- **Video ghi hình lớp học** để phân tích hậu kỳ (offline)
+- **File cấu hình** ngưỡng cảnh báo (`src/config.py`, có thể tùy chỉnh)
 
 ---
 
 ## 4. Outputs (Đầu ra)
 
-- **Màn hình real-time:** Bounding box khuôn mặt + nhãn trạng thái (OK / DISTRACTED / SLEEPING / TALKING / ABSENT)
-- **Dashboard chỉ số:** Yaw, Pitch, EAR, MAR hiển thị trực tiếp
+- **Màn hình real-time:** Bounding box khuôn mặt + nhãn trạng thái (OK / DISTRACTED / SLEEPING / TALKING / ABSENT / PHONE_USAGE)
+- **Dashboard chỉ số:** Yaw, Pitch, EAR, MAR, Attention Score hiển thị trực tiếp
 - **Ảnh bằng chứng:** Tự động chụp và lưu khi phát hiện vi phạm
 - **File log CSV:** Ghi lại toàn bộ lịch sử vi phạm (thời gian, loại vi phạm, đường dẫn ảnh)
+- **Video annotated + CSV chi tiết/tóm tắt** (chế độ phân tích video)
 
 ---
 
 ## 5. Phương pháp & Mô hình đề xuất (Proposed Methods)
 
+> **Lưu ý quan trọng:** Hệ thống sử dụng hoàn toàn **rule-based** (dựa trên ngưỡng cố định).
+> Không có model nào được huấn luyện riêng. Tất cả ngưỡng được cấu hình trong `src/config.py`.
+
 ### A. Phát hiện khuôn mặt (Face Detection)
-- **Haar Cascade** (OpenCV có sẵn) để xác định bounding box — nhẹ, nhanh
-- **MediaPipe FaceMesh** để trích xuất 468 điểm landmarks chính xác
+- **MediaPipe FaceMesh** — trích xuất 478 điểm landmarks chính xác
+- Không sử dụng Haar Cascade
 
 ### B. Ước tính góc đầu (Head Pose Estimation)
-Dùng `cv2.solvePnP()` kết hợp 6 điểm landmarks chuẩn để tính 3 góc:
-- **Yaw** (ngang): > 30° → nhìn sang ngang → mất tập trung
-- **Pitch** (dọc): < -25° → cúi xuống → đang dùng điện thoại
-- **Roll**: nghiêng đầu
+Dùng `cv2.solvePnP()` kết hợp **14 điểm landmarks** và phân tích góc Euler bằng `atan2` (ZYX Tait–Bryan convention):
+- **Yaw** (ngang): > 32° → nhìn sang ngang → mất tập trung
+- **Pitch** (dọc): < -25° → cúi xuống → mất tập trung (có thể bật/tắt qua `video_use_pitch_distraction`)
+- **Roll**: nghiêng đầu (hiện không dùng để phân loại)
 
 ### C. Phát hiện ngủ gật (Eye Aspect Ratio — EAR)
 ```
 EAR = (||P2-P6|| + ||P3-P5||) / (2 × ||P1-P4||)
 ```
-- EAR < 0.22 liên tục ≥ 3 giây → ngủ gật
+- EAR < ngưỡng liên tục ≥ 3 giây → ngủ gật
 
 ### D. Phát hiện nói chuyện (Mouth Aspect Ratio — MAR)
 ```
@@ -69,28 +76,37 @@ MAR = (||A|| + ||B||) / (2 × ||C||)
 ```
 - MAR > 0.6 liên tục ≥ 2 giây → đang nói chuyện
 
-### E. Phát hiện bất thường khác
+### E. Phát hiện sử dụng điện thoại (Phone Detection)
+- Dùng **YOLOv8n pre-trained** (COCO) để phát hiện class `person` và `cell phone`
+- Không huấn luyện hay fine-tune model YOLO — chỉ dùng model có sẵn
+- Khi điện thoại xuất hiện gần sinh viên → gắn nhãn PHONE_USAGE
+
+### F. Phát hiện bất thường khác
 - **Không có mặt** ≥ 3 giây → cảnh báo rời khỏi vị trí
-- **Nhiều hơn 1 khuôn mặt** trong frame → có người khác hỗ trợ
+- **Liveness score** dựa trên chớp mắt + chuyển động đầu → phát hiện ảnh tĩnh/giả mạo
 
 ---
 
 ## 6. Kiến trúc hệ thống
 
 ```
-Webcam
+Webcam / Video file
   ↓
-Face Detection (Haar Cascade + MediaPipe FaceMesh)
+Face Detection (MediaPipe FaceMesh — 478 landmarks)
   ↓
-┌──────────────────────────────────────────┐
-│           Phân tích song song            │
-│  ┌────────────┐  ┌──────┐  ┌─────────┐  │
-│  │ Head Pose  │  │ EAR  │  │   MAR   │  │
-│  │(Yaw/Pitch) │  │(Mắt) │  │(Miệng)  │  │
-│  └────────────┘  └──────┘  └─────────┘  │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│               Phân tích song song                    │
+│  ┌────────────┐  ┌──────┐  ┌─────────┐  ┌────────┐ │
+│  │ Head Pose  │  │ EAR  │  │   MAR   │  │Liveness│ │
+│  │(Yaw/Pitch) │  │(Mắt) │  │(Miệng)  │  │ Score  │ │
+│  └────────────┘  └──────┘  └─────────┘  └────────┘ │
+└──────────────────────────────────────────────────────┘
   ↓
-Alert System
+State Classifier (rule-based: ngưỡng cố định)
+  ↓
+┌──────────────────────────────────────────────────────┐
+│  Attention Score + Temporal Buffer + Pattern Alerts   │
+└──────────────────────────────────────────────────────┘
   ↓
 Dashboard + Lưu bằng chứng + Ghi log CSV
 ```
@@ -99,30 +115,60 @@ Dashboard + Lưu bằng chứng + Ghi log CSV
 
 ## 7. Stack công nghệ
 
-| Thành phần         | Thư viện / Công cụ                    |
-|--------------------|---------------------------------------|
-| Xử lý video        | OpenCV (cv2)                          |
-| Face Landmarks     | MediaPipe FaceMesh                    |
-| Head Pose          | cv2.solvePnP + cv2.RQDecomp3x3        |
-| EAR / MAR          | scipy.spatial.distance                |
-| Báo cáo            | LaTeX (Overleaf)                      |
+| Thành phần              | Thư viện / Công cụ                              |
+|-------------------------|--------------------------------------------------|
+| Xử lý video             | OpenCV (cv2)                                     |
+| Face Detection/Landmarks | MediaPipe FaceMesh (478 điểm)                   |
+| Head Pose               | cv2.solvePnP + atan2 Euler (14 landmarks)        |
+| EAR / MAR               | scipy.spatial.distance                           |
+| Phone/Person Detection  | YOLOv8n pre-trained (ultralytics, tùy chọn)      |
+| Phân loại trạng thái    | Rule-based (ngưỡng cố định, không huấn luyện)    |
 
 ---
 
 ## 8. Cấu trúc thư mục project
 
 ```
-e-proctoring/
-├── src/
-│   ├── main.py              # Vòng lặp chính, hiển thị dashboard
-│   ├── face_detector.py     # Phát hiện khuôn mặt + landmarks
-│   ├── head_pose.py         # Ước tính góc Yaw/Pitch/Roll
-│   ├── eye_monitor.py       # Tính EAR, phát hiện ngủ gật
-│   ├── mouth_monitor.py     # Tính MAR, phát hiện nói chuyện
-│   └── alert_system.py      # Lưu bằng chứng + ghi log CSV
-├── evidence/                # Ảnh bằng chứng + violations.csv
+AI-PROJECT/
+├── main.py                          # Entry point
 ├── requirements.txt
-└── report/                  # Báo cáo LaTeX
+├── run_main.bat
+├── run_video_analysis.bat
+├── yolov8n.pt                       # YOLO pre-trained (COCO)
+├── src/
+│   ├── __init__.py
+│   ├── config.py                    # Tất cả ngưỡng và cấu hình
+│   ├── main.py                      # Vòng lặp webcam + dashboard
+│   ├── face_detector.py             # MediaPipe FaceMesh wrapper
+│   ├── head_pose.py                 # solvePnP + atan2 Euler angles
+│   ├── eye_monitor.py               # Tính EAR, phát hiện ngủ gật
+│   ├── mouth_monitor.py             # Tính MAR, phát hiện nói chuyện
+│   ├── state_classifier.py          # Phân loại trạng thái (rule-based)
+│   ├── student_state.py             # Tổng hợp trạng thái mỗi sinh viên
+│   ├── alert_system_v2.py           # Lưu bằng chứng + ghi log CSV
+│   ├── dashboard.py                 # Dashboard overlay trực tiếp
+│   ├── liveness_detector.py         # Phát hiện ảnh tĩnh/giả mạo
+│   ├── identity_verifier.py         # Xác minh danh tính qua landmarks
+│   ├── database.py                  # Đọc students.csv
+│   ├── phone_detector.py            # YOLOv8n person + phone detector
+│   ├── video_analyzer.py            # Phân tích video ghi hình
+│   ├── video_tracker.py             # Centroid tracker đa khuôn mặt
+│   ├── behavior_analyzer/
+│   │   ├── temporal_buffer.py       # Buffer chỉ số theo thời gian
+│   │   ├── attention_score.py       # Điểm tập trung (EMA)
+│   │   ├── pattern_detector.py      # Phát hiện pattern hành vi
+│   │   └── decision_engine.py       # Logic quyết định cảnh báo
+│   └── analytics/
+│       ├── evaluate.py              # Đánh giá độ chính xác
+│       └── session_report.py        # Báo cáo phiên học
+├── database/
+│   ├── students.csv                 # student_id, name, reference_image
+│   └── reference_images/            # Ảnh tham chiếu mỗi sinh viên
+├── evidence/
+│   ├── violations.csv               # Log vi phạm tự động
+│   └── images/                      # Ảnh bằng chứng tự động
+└── output/
+    └── video_analysis/              # Kết quả phân tích video
 ```
 
 ---
@@ -130,10 +176,9 @@ e-proctoring/
 ## 9. Kết quả dự kiến (Expected Outcomes)
 
 - Hệ thống giám thị hoàn chỉnh, giao diện trực quan, chạy real-time
-- Phát hiện được ≥ 5 loại hành vi làm việc riêng phổ biến
+- Phát hiện được ≥ 6 loại trạng thái: OK, DISTRACTED, SLEEPING, TALKING, ABSENT, PHONE_USAGE
 - FPS ổn định ≥ 20 FPS trên máy tính thông thường (không GPU)
 - Độ trễ cảnh báo (Latency) < 500ms từ lúc phát hiện đến lúc hiển thị
-- Báo cáo kỹ thuật LaTeX hoàn chỉnh
 
 ---
 
