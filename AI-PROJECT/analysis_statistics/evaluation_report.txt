@@ -1,0 +1,20 @@
+================================================================
+ BAO CAO DANH GIA (EVALUATION REPORT)
+================================================================
+ Tong so mau (samples): 858
+ Accuracy             : 3.15%
+ States without ground-truth labels: DISTRACTED, TALKING, SLEEPING
+----------------------------------------------------------------
+ Trang thai     Precision    Recall      F1  Support
+----------------------------------------------------------------
+ OK                 0.692     0.167   0.269      162
+ DISTRACTED                       NO LABELS        0
+ TALKING                          NO LABELS        0
+ SLEEPING                         NO LABELS        0
+ ABSENT             0.000     0.000   0.000       10
+ PHONE_USAGE        0.000     0.000   0.000      225
+ BODY_ONLY          0.000     0.000   0.000      461
+----------------------------------------------------------------
+ MACRO AVG*         0.173     0.042   0.067
+ *Macro avg is computed only over states with labels.
+================================================================

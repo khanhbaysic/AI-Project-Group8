@@ -23,7 +23,7 @@ BODY_ONLY   = "BODY_ONLY"    # body visible but face unclear
 # Ordered list (used for confusion-matrix axes and heatmap legends)
 # ---------------------------------------------------------------------------
 
-ALL_STATES = [OK, BODY_ONLY, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT]
+ALL_STATES = [OK, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT]
 
 # Same order expected by evaluate.py
 EVAL_STATES = [OK, DISTRACTED, TALKING, SLEEPING, ABSENT, PHONE_USAGE, BODY_ONLY]
@@ -40,6 +40,17 @@ LABEL_VI = {
     PHONE_USAGE: "Dung dien thoai",
     SLEEPING:    "Ngu gat",
     ABSENT:      "Vang mat",
+}
+
+# Human-readable labels (English)
+LABEL_EN = {
+    OK:          "Focused",
+    BODY_ONLY:   "Body Only",
+    DISTRACTED:  "Distracted",
+    TALKING:     "Talking",
+    PHONE_USAGE: "Phone Usage",
+    SLEEPING:    "Sleeping",
+    ABSENT:      "Absent",
 }
 
 # Shared visual palette. Values are CSS hex colors; OpenCV callers can convert

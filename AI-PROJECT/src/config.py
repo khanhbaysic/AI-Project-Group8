@@ -63,9 +63,9 @@ CONFIG = {
     "buffer_seconds": 60.0,
     "pattern_interval": 0.5,
 
-    "liveness_threshold": 0.35,
-    "liveness_warmup_seconds": 4.0,
-    "liveness_window_seconds": 8.0,
+    "liveness_threshold": 0.38,
+    "liveness_warmup_seconds": 1.5,
+    "liveness_window_seconds": 3.5,
 
     "identity_similarity_threshold": 0.88,
     "identity_check_interval": 0.5,
