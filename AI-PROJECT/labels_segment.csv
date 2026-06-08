@@ -1,7 +1,0 @@
-student,start,end,true_state
-Student_1,0,9,PHONE_USAGE
-Student_1,9,16,ABSENT
-Student_2,0,8,OK
-Student_2,8,16,BODY_ONLY
-Student_3,0,16,BODY_ONLY
-Student_4,0,16,BODY_ONLY

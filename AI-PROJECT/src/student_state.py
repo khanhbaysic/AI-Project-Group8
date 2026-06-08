@@ -11,7 +11,12 @@ from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING,
 class StudentState:
     def __init__(self, student_label, config):
         self.student_label = student_label
-        self.eye_monitor = EyeMonitor(config["ear_threshold"], config["sleep_duration"])
+        self.eye_monitor = EyeMonitor(
+            config["ear_threshold"],
+            config["sleep_duration"],
+            config.get("sleep_use_min_eye_ear", True),
+            config.get("sleep_min_eye_threshold_factor", 0.9),
+        )
         self.mouth_monitor = MouthMonitor(
             config["mar_threshold"], config["talk_duration"],
             talk_window=config.get("talk_window", 1.5),

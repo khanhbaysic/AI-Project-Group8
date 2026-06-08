@@ -17,7 +17,7 @@ def _get_stats_dir():
     return stats_dir
 
 
-def run_post_analytics(detail_csv):
+def run_post_analytics(detail_csv, labels_csv=None):
     """Generate heatmap and (optionally) confusion matrix from a details CSV.
 
     All outputs are written to ``AI-PROJECT/analysis_statistics/``.
@@ -26,6 +26,9 @@ def run_post_analytics(detail_csv):
     ----------
     detail_csv : str or Path
         Path to the ``*_details.csv`` produced by video_analyzer or main.
+    labels_csv : str or Path or None
+        Optional explicit ground-truth segment labels CSV. If omitted, the
+        usual sibling/root lookup is used.
     """
     detail_csv = Path(detail_csv)
     stats_dir = _get_stats_dir()
@@ -38,14 +41,14 @@ def run_post_analytics(detail_csv):
         print(f"[WARN] Session report generation failed: {exc}")
 
     # ---- 2. Confusion matrix ---- only if ground-truth labels exist
-    _try_confusion_matrix(detail_csv, stats_dir)
+    _try_confusion_matrix(detail_csv, stats_dir, labels_csv)
 
 
 # ------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------
 
-def _try_confusion_matrix(detail_csv, output_dir):
+def _try_confusion_matrix(detail_csv, output_dir, labels_csv=None):
     """Run evaluation if a matching ground-truth labels file is found."""
     try:
         from src.analytics.evaluate import (
@@ -60,7 +63,7 @@ def _try_confusion_matrix(detail_csv, output_dir):
         print(f"[WARN] Could not import evaluate module: {exc}")
         return
 
-    labels_path = _find_labels(detail_csv)
+    labels_path = _find_labels(detail_csv, labels_csv)
     if labels_path is None:
         print("[INFO] No ground-truth labels file found -- skipping confusion matrix.")
         print("       To enable, place a segment labels CSV next to the details file")
@@ -93,7 +96,7 @@ def _try_confusion_matrix(detail_csv, output_dir):
         print(f"[WARN] Confusion matrix generation failed: {exc}")
 
 
-def _find_labels(detail_csv):
+def _find_labels(detail_csv, labels_csv=None):
     """Search for a ground-truth labels file that matches *detail_csv*.
 
     Lookup order:
@@ -101,6 +104,13 @@ def _find_labels(detail_csv):
          (e.g. ``classroom_test_labels.csv`` for ``classroom_test_details.csv``)
       2. ``labels_segment.csv`` in the project root (AI-PROJECT/)
     """
+    if labels_csv:
+        candidate = Path(labels_csv)
+        if candidate.exists():
+            return candidate
+        print(f"[WARN] Ground-truth labels file not found: {candidate}")
+        return None
+
     detail_csv = Path(detail_csv)
 
     # 1. Sibling file:  <stem>_labels.csv

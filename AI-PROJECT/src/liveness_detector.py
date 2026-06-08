@@ -44,14 +44,17 @@ class LivenessDetector:
         warmup_seconds: float = 2.5,
         window_seconds: float = 5.0,
         ear_threshold: float = 0.22,
+        spoof_confirm_seconds: float = 4.0,
     ):
         self.threshold = threshold
         self.warmup_seconds = warmup_seconds
         self.window_seconds = window_seconds
         self.ear_threshold = ear_threshold
+        self.spoof_confirm_seconds = spoof_confirm_seconds
 
         self.samples: deque = deque()
         self.started_at: float | None = None
+        self._spoofing_since: float | None = None
         self._was_open: bool = True
         self._blink_count: int = 0
 
@@ -197,5 +200,15 @@ class LivenessDetector:
         if elapsed < self.warmup_seconds:
             return max(0.5, score), "CHECKING"
 
-        status = "LIVE" if score >= self.threshold else "SPOOFING"
+        if score >= self.threshold:
+            self._spoofing_since = None
+            status = "LIVE"
+        else:
+            if self._spoofing_since is None:
+                self._spoofing_since = now
+            status = (
+                "SPOOFING"
+                if now - self._spoofing_since >= self.spoof_confirm_seconds
+                else "CHECKING"
+            )
         return round(float(score), 3), status

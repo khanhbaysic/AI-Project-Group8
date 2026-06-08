@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from src.behavior_analyzer.attention_score import AttentionScorer
-from src.eye_monitor import LEFT_EYE, RIGHT_EYE, eye_aspect_ratio
+from src.eye_monitor import LEFT_EYE, RIGHT_EYE, EyeMonitor, eye_aspect_ratio
 from src.mouth_monitor import MOUTH_POINTS, MouthMonitor
 from src.states import DISTRACTED, OK, SLEEPING
 from src.video_tracker import CentroidTracker
@@ -28,6 +28,13 @@ def landmarks_with_eyes(open_height):
     return landmarks
 
 
+def landmarks_with_asymmetric_eyes(left_height, right_height):
+    landmarks = np.zeros((478, 3), dtype=np.float32)
+    landmarks[LEFT_EYE, :2] = eye_points(left_height)
+    landmarks[RIGHT_EYE, :2] = eye_points(right_height)
+    return landmarks
+
+
 def landmarks_with_mar(mar):
     landmarks = np.zeros((478, 3), dtype=np.float32)
     v = 5.0 * mar
@@ -49,6 +56,19 @@ class EyeMonitorTests(unittest.TestCase):
         closed_ear = eye_aspect_ratio(eye_points(0.1))
         self.assertGreater(open_ear, closed_ear)
         self.assertAlmostEqual(open_ear, 1.0, places=3)
+
+    def test_sleeping_uses_closed_eye_when_other_eye_is_noisy(self):
+        monitor = EyeMonitor(
+            ear_threshold=0.21,
+            sleep_duration=1.0,
+            use_min_eye_ear=True,
+            min_eye_threshold_factor=0.9,
+        )
+        landmarks = landmarks_with_asymmetric_eyes(0.1, 1.0)
+        _, sleeping = monitor.check(landmarks, now=0.0)
+        self.assertFalse(sleeping)
+        _, sleeping = monitor.check(landmarks, now=1.1)
+        self.assertTrue(sleeping)
 
 
 class MouthMonitorTests(unittest.TestCase):

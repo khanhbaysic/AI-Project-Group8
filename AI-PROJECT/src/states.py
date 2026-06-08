@@ -23,7 +23,7 @@ BODY_ONLY   = "BODY_ONLY"    # body visible but face unclear
 # Ordered list (used for confusion-matrix axes and heatmap legends)
 # ---------------------------------------------------------------------------
 
-ALL_STATES = [OK, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT]
+ALL_STATES = [OK, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT, BODY_ONLY]
 
 # Same order expected by evaluate.py
 EVAL_STATES = [OK, DISTRACTED, TALKING, SLEEPING, ABSENT, PHONE_USAGE, BODY_ONLY]
