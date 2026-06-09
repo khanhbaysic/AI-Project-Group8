@@ -24,6 +24,10 @@ Thumbs.db
 *.mkv
 
 # --- Generated outputs (regenerated every run) ---
+analysis_statistics/
+**/analysis_statistics/
+input/
+**/input/
 output/
 **/output/
 evidence/
