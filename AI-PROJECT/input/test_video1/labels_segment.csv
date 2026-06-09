@@ -1,9 +1,0 @@
-student,start,end,true_state
-Student_1,0,4,OK
-Student_1,5,10,DISTRACTED
-Student_1,14,20,SLEEPING
-Student_1,21,25,OK
-Student_1,27,33,TALKING
-Student_1,36,44,PHONE_USAGE
-Student_1,48,57,BODY_ONLY
-Student_1,59,63,ABSENT
