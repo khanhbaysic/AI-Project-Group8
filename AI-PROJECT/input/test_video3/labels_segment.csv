@@ -1,0 +1,11 @@
+student,start,end,true_state
+Student_1,0,4,OK
+Student_1,6,13,DISTRACTED
+Student_1,16,21,TALKING
+Student_1,24,26,DISTRACTED
+Student_1,27,34,PHONE_USAGE
+Student_1,35,41,SLEEPING
+Student_1,44,51,TALKING
+Student_1,53,58,BODY_ONLY
+Student_1,63,67,ABSENT
+Student_1,68,69,OK
