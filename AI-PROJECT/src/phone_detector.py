@@ -95,7 +95,18 @@ class PhoneDetector:
                     classes=[67],
                 )
             else:
-                results = self.predict_model.predict(frame, conf=self.confidence, verbose=False)
+                phone_results = self.predict_model.predict(
+                    frame,
+                    conf=self.confidence,
+                    verbose=False,
+                    classes=[67],
+                )
+                person_predict_results = self.predict_model.predict(
+                    frame,
+                    conf=self.person_confidence,
+                    verbose=False,
+                    classes=[0],
+                )
         except Exception as exc:
             self.warning = f"Phone detection failed: {exc}"
             return [], []
@@ -146,7 +157,7 @@ class PhoneDetector:
                         phones.append(PhoneDetection(bbox, float(box.conf[0])))
             return phones, people
 
-        for result in results:
+        for result in phone_results:
             names = result.names
             for box in result.boxes:
                 cls_id = int(box.cls[0])
@@ -157,8 +168,18 @@ class PhoneDetector:
                 if label in {"cell phone", "mobile phone", "phone"}:
                     if self._valid_phone_bbox(bbox):
                         phones.append(PhoneDetection(bbox, confidence))
-                elif label == "person":
-                    people.append(PersonDetection(bbox, confidence))
+
+        for result in person_predict_results:
+            names = result.names
+            for box in result.boxes:
+                cls_id = int(box.cls[0])
+                label = str(names.get(cls_id, "")).lower()
+                if label != "person":
+                    continue
+                x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+                confidence = float(box.conf[0])
+                bbox = (x1, y1, x2 - x1, y2 - y1)
+                people.append(PersonDetection(bbox, confidence))
         return phones, people
 
     def _valid_phone_bbox(self, bbox):

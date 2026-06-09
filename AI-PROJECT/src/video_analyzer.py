@@ -57,9 +57,17 @@ def point_inside_bbox(point, bbox):
     return x <= px <= x + w and y <= py <= y + h
 
 
-def filter_people(people, width, height, min_area_ratio):
+def filter_people(people, width, height, min_area_ratio, nms_iou=0.45):
     min_area = width * height * min_area_ratio
-    return [person for person in people if bbox_area(person.bbox) >= min_area]
+    candidates = [person for person in people if bbox_area(person.bbox) >= min_area]
+    candidates.sort(key=lambda person: (person.confidence, bbox_area(person.bbox)), reverse=True)
+
+    kept = []
+    for person in candidates:
+        if any(bbox_iou(person.bbox, existing.bbox) >= nms_iou for existing in kept):
+            continue
+        kept.append(person)
+    return kept
 
 
 def find_face_for_person(person_bbox, face_bboxes, used_face_indices):
@@ -143,12 +151,14 @@ def assign_phones_to_people(
     return owners, assigned_phone_indices
 
 
-def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
+def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_csv=None):
     video_path = Path(video_path)
     if not video_path.exists():
         raise FileNotFoundError(f"Video not found: {video_path}")
 
     output_dir = Path(output_dir)
+    if output_dir.name != video_path.stem:
+        output_dir = output_dir / video_path.stem
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cap = cv2.VideoCapture(str(video_path))
@@ -233,6 +243,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
                     width,
                     height,
                     CONFIG.get("person_min_box_area_ratio", 0.01),
+                    CONFIG.get("person_nms_iou", 0.45),
                 )
             else:
                 phone_detections = phone_detector.detect(frame)
@@ -614,15 +625,23 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR):
     summary_fields = [
         "student", "total_seconds", "final_attention_score", "ok_seconds",
         "distracted_seconds", "sleeping_seconds", "talking_seconds",
-        "phone_usage_seconds", "body_only_seconds", "absent_seconds", "pattern_alerts",
+        "phone_usage_seconds", "body_only_seconds", "absent_seconds",
+        "score_impact", "pattern_alerts",
     ]
     write_csv(summary_csv, summary_rows, summary_fields)
+
+    try:
+        from src.analytics import run_post_analytics
+        run_post_analytics(detail_csv, labels_csv, output_dir=output_dir)
+    except Exception as exc:
+        print(f"[WARN] Post-analysis failed: {exc}")
 
     elapsed = time.time() - start
     return {
         "output_video": output_video,
         "detail_csv": detail_csv,
         "summary_csv": summary_csv,
+        "output_dir": output_dir,
         "students": len(students),
         "frames": frame_idx,
         "elapsed_seconds": elapsed,
@@ -633,13 +652,15 @@ def main():
     parser = argparse.ArgumentParser(description="Analyze a recorded classroom video.")
     parser.add_argument("video", nargs="?", help="Path to input classroom video")
     parser.add_argument("--show", action="store_true", help="Show annotated video while processing")
+    parser.add_argument("--labels", default=None, help="Path to labels_segment CSV for evaluation")
     args = parser.parse_args()
 
     video = args.video or input("Enter video path: ").strip().strip('"')
-    result = analyze_video(Path(video), show=args.show)
+    result = analyze_video(Path(video), show=args.show, labels_csv=args.labels)
     print("[INFO] Video analysis completed.")
     print(f"[INFO] Students tracked: {result['students']}")
     print(f"[INFO] Frames processed: {result['frames']}")
+    print(f"[INFO] Output folder: {result['output_dir']}")
     print(f"[INFO] Output video: {result['output_video']}")
     print(f"[INFO] Details CSV: {result['detail_csv']}")
     print(f"[INFO] Summary CSV: {result['summary_csv']}")

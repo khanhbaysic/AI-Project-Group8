@@ -1,3 +1,6 @@
+from src.states import DISTRACTED
+
+
 class PatternDetector:
     def __init__(
         self,
@@ -17,9 +20,9 @@ class PatternDetector:
 
     def detect(self, buffer):
         patterns = []
-        if buffer.duration_state("DISTRACTED", self.frequent_distraction_window) > self.frequent_distraction_seconds:
+        if buffer.duration_state(DISTRACTED, self.frequent_distraction_window) > self.frequent_distraction_seconds:
             patterns.append("Frequent Distraction")
-        if buffer.continuous_duration("DISTRACTED") > self.sustained_distraction_seconds:
+        if buffer.continuous_duration(DISTRACTED) > self.sustained_distraction_seconds:
             patterns.append("Sustained Distraction")
         if buffer.mean("ear", 3.0) < self.progressive_drowsiness_ear_threshold and buffer.slope("pitch", 5.0) < -0.5:
             patterns.append("Progressive Drowsiness")

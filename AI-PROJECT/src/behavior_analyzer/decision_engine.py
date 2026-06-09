@@ -1,3 +1,6 @@
+from src.states import PHONE_USAGE, SLEEPING, TALKING
+
+
 class DecisionEngine:
     def decide(self, record, patterns):
         alerts = []
@@ -21,6 +24,21 @@ class DecisionEngine:
         elif record.get("attention_score", 100) < 60 and level != "CRITICAL":
             alerts.append("Attention Score Warning")
             level = "WARNING"
+
+        # Behavioral state alerts
+        state = record.get("state", "")
+        if state == SLEEPING:
+            alerts.append("Sleeping Detected")
+            if level == "OK":
+                level = "WARNING"
+        elif state == TALKING:
+            alerts.append("Talking Detected")
+            if level == "OK":
+                level = "WARNING"
+        elif state == PHONE_USAGE:
+            alerts.append("Phone Usage Detected")
+            if level == "OK":
+                level = "WARNING"
 
         for pattern in patterns:
             alerts.append(pattern)

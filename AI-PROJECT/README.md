@@ -1,169 +1,180 @@
 # Intelligent E-Proctoring System
 
-This project implements a lightweight real-time e-proctoring prototype using webcam-based facial behavior analysis.
+Rule-based computer-vision prototype for online proctoring and classroom
+attention analysis. The system uses MediaPipe FaceMesh landmarks, OpenCV,
+temporal rules, an attention score, optional YOLOv8 phone/person detection,
+and privacy-first session reports.
 
-## Features
+## Important Notes
 
-- Real-time webcam monitoring with OpenCV.
-- MediaPipe FaceMesh landmark extraction.
-- Head pose estimation with `cv2.solvePnP`.
-- EAR-based drowsiness detection.
-- MAR-based talking detection.
-- Liveness score from blink, head motion, and landmark motion cues.
-- Student ID lookup from a local CSV database.
-- Face verification with a lightweight FaceMesh landmark embedding.
-- Continuous Attention Score from 0 to 100.
-- 60-second temporal buffer and temporal pattern alerts.
-- Evidence image capture and CSV logging.
-- Live dashboard with state, alerts, identity, liveness, metrics, and attention trend.
+- This project is rule-based. It does not train a custom AI model.
+- `yolov8n.pt` is a pre-trained YOLO COCO model used only for `person` and
+  `cell phone` detection.
+- Face landmarks come from MediaPipe FaceMesh, not Haar Cascade.
+- Use Python 3.12 on Windows. Python 3.14 is not supported by MediaPipe at the
+  time this project was configured.
 
 ## Project Structure
 
 ```text
 AI-PROJECT/
-  main.py
-  src/
-    main.py
-    face_detector.py
-    liveness_detector.py
-    identity_verifier.py
-    database.py
-    head_pose.py
-    eye_monitor.py
-    mouth_monitor.py
-    state_classifier.py
-    alert_system.py
-    dashboard.py
-    behavior_analyzer/
-      temporal_buffer.py
-      attention_score.py
-      pattern_detector.py
-      decision_engine.py
+  main.py                         # webcam entry point wrapper
+  run_main.bat                    # run webcam mode
+  run_video_analysis.bat          # run offline video mode
+  requirements.txt
   database/
     students.csv
     reference_images/
   evidence/
     violations.csv
     images/
-  requirements.txt
-  run_main.bat
+  output/
+    webcam_session/
+    video_analysis/
+  src/
+    main.py                       # live webcam, single student
+    video_analyzer.py             # offline video, multi-student
+    states.py                     # canonical 7 states and shared colors
+    dashboard.py
+    face_detector.py
+    head_pose.py
+    eye_monitor.py
+    mouth_monitor.py
+    phone_detector.py
+    identity_verifier.py
+    liveness_detector.py
+    behavior_analyzer/
+    analytics/
+  tests/
 ```
 
-## Setup
+## Setup on Windows
 
-Install dependencies with Python 3.12:
+Open PowerShell in the project folder:
 
-```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m pip install -r requirements.txt
+```powershell
+cd C:\Users\PC\Documents\AI-Project-Group8\AI-PROJECT
+py -3.12 -m venv venv
+.\venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
+
+If `requirements.txt` is not found, you are probably in the wrong folder. Run
+`dir` and make sure `requirements.txt` is listed.
 
 ## Student Database Format
 
-Edit `database/students.csv`:
+`database/students.csv`:
 
 ```csv
 student_id,name,reference_image
-202417140,Sample Student,reference_images/202417140.jpg
+202417140,Student Name,reference_images/202417140.jpg
 ```
 
-The `reference_image` path is relative to the `database/` folder unless an absolute path is provided.
+Reference image paths are relative to `database/`.
 
-## Run
+## Run Webcam Mode
 
-```bat
-run_main.bat
+```powershell
+python main.py
 ```
 
-Or:
+Then enter a student ID from `database/students.csv`.
 
-```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe main.py
-```
+Controls:
 
-Enter the student ID when prompted.
+- Press `q` or `ESC` to exit.
+- Closing the OpenCV window also stops the system.
 
-## Analyze A Recorded Classroom Video
+Webcam output:
 
-You can also use a recorded classroom video instead of the webcam workflow.
+- Session CSV: `output/webcam_session/*_details.csv`
+- Evidence images and alerts: `evidence/`
+- Session report and heatmap: `output/webcam_session/`
 
-```bat
-run_video_analysis.bat "C:\path\to\class_recording.mp4"
-```
+## Run Offline Video Analysis
 
-Or:
-
-```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m src.video_analyzer "C:\path\to\class_recording.mp4"
-```
-
-The analyzer automatically detects and tracks faces as:
+Put an `.mp4` file anywhere convenient, for example:
 
 ```text
-Student_1
-Student_2
-Student_3
+videos/classroom_test.mp4
 ```
 
-Outputs are saved to:
+Run:
+
+```powershell
+python -m src.video_analyzer videos\classroom_test.mp4
+```
+
+Video output:
+
+- Annotated video: `output/video_analysis/classroom_test/classroom_test_annotated.mp4`
+- Details CSV: `output/video_analysis/classroom_test/classroom_test_details.csv`
+- Summary CSV: `output/video_analysis/classroom_test/classroom_test_summary.csv`
+- Session report, heatmap, evaluation report, and confusion matrix:
+  `output/video_analysis/classroom_test/`
+
+## Generate Session Report
+
+```powershell
+python -m src.analytics.session_report output\video_analysis\classroom_test\classroom_test_details.csv
+```
+
+The report is privacy-first: it uses geometric and aggregate data only, not
+saved face images.
+
+## Evaluation Workflow
+
+Create a label template from a details CSV:
+
+```powershell
+python -m src.analytics.make_label_template output\video_analysis\classroom_test\classroom_test_details.csv --output labels_segment.csv
+```
+
+Fill `true_state` manually using one of:
 
 ```text
-output/video_analysis/
+OK, DISTRACTED, TALKING, SLEEPING, ABSENT, PHONE_USAGE, BODY_ONLY
 ```
 
-Generated files:
+Then run:
 
-```text
-<video_name>_annotated.mp4
-<video_name>_details.csv
-<video_name>_summary.csv
+```powershell
+python -m src.analytics.evaluate --mode segment --labels labels_segment.csv --details output\video_analysis\classroom_test\classroom_test_details.csv --out-dir output\video_analysis\classroom_test
 ```
 
-Current limitation: the first version uses centroid tracking, so student IDs are stable when students remain roughly in place. If students cross over each other or leave/re-enter often, a stronger tracker such as DeepSORT or face embeddings should be added.
+The evaluation report prints all 7 states. If a state has no ground-truth
+labels, it appears as `NO LABELS` instead of being silently skipped.
 
-For classroom video analysis, downward head pose is not treated as distracted by default because students may be writing notes or doing a paper exercise. The video mode mainly flags strong side-looking, sleeping, talking, and absence. You can re-enable downward distraction by setting `video_use_pitch_distraction` to `True` in `src/config.py`.
+## Run Tests
 
-### Optional Phone Usage Detection
-
-The video analyzer includes optional phone detection. It uses YOLO through the `ultralytics` package to detect the COCO class `cell phone`.
-
-Install the optional dependency:
-
-```bat
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m pip install ultralytics
+```powershell
+python -m unittest discover -s tests
 ```
 
-Then run the analyzer again. The first run may download `yolov8n.pt` if it is not already available.
+The tests cover pure-logic pieces that do not need a webcam:
 
-Relevant settings in `src/config.py`:
+- EAR calculation
+- MAR/talking oscillation logic
+- Attention score movement
+- Centroid tracker ID stability
 
-```python
-"phone_detection_enabled": True,
-"phone_model_path": "yolov8n.pt",
-"phone_confidence": 0.35,
-"phone_interval_frames": 5,
-"phone_near_student_scale": 1.8,
-```
+## Current Behavioral States
 
-When a phone is detected near a tracked student, that student is labeled:
+- `OK`: focused
+- `DISTRACTED`: looking away or down
+- `TALKING`: mouth oscillation detected
+- `SLEEPING`: eyes closed too long
+- `ABSENT`: tracked student missing long enough
+- `PHONE_USAGE`: phone detected near a student
+- `BODY_ONLY`: person visible but face unclear
 
-```text
-PHONE_USAGE
-```
+## Known Limitations
 
-and `phone_usage_seconds` appears in the summary CSV.
-
-## How To Test
-
-- `ABSENT`: leave the camera frame.
-- `DISTRACTED`: look left/right or downward beyond the configured thresholds.
-- `SLEEPING`: close eyes for at least 3 seconds.
-- `TALKING`: keep mouth open above the MAR threshold for at least 2 seconds.
-- `SPOOFING`: hold a static image/photo in front of the webcam; after warmup the liveness score should remain low.
-- `Identity Mismatch`: use a different face from the reference image in `database/students.csv`.
-- `Attention Score`: observe the score decrease during negative states and recover slowly during `OK`.
-
-## Notes And Limitations
-
-The current identity verifier uses a CPU-friendly FaceMesh landmark embedding and cosine similarity. This is explainable and easy to run, but it is not as accurate as a production face recognition model. For stronger identity verification, replace `src/identity_verifier.py` with ArcFace, InsightFace, DeepFace, or another face embedding model.
-
-The liveness detector uses blink and motion cues. It is suitable for an academic prototype, but a dedicated anti-spoofing model would be required for high-stakes deployment.
+- Identity verification currently uses lightweight landmark geometry, not
+  ArcFace/InsightFace embeddings.
+- Liveness is heuristic and webcam-only; it is not robust against advanced
+  replay/deepfake attacks.
+- Phone detection uses generic YOLO COCO classes, so fine-tuning would improve
+  phone-in-hand accuracy in classroom videos.
