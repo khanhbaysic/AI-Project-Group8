@@ -4,6 +4,7 @@ from src.behavior_analyzer.attention_score import AttentionScorer
 from src.behavior_analyzer.pattern_detector import PatternDetector
 from src.behavior_analyzer.temporal_buffer import TemporalBuffer
 from src.eye_monitor import EyeMonitor
+from src.liveness_detector import LivenessDetector
 from src.mouth_monitor import MouthMonitor
 from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
 
@@ -23,6 +24,18 @@ class StudentState:
             talk_min_transitions=config.get("talk_min_transitions", 3),
             talk_mar_variance_threshold=config.get("talk_mar_variance_threshold", 0.005),
         )
+        # Anti-spoofing (liveness) per tracked student. This needs NO student ID
+        # and NO reference image -- it only inspects the face landmarks over
+        # time -- so, unlike identity, it works in the multi-student video mode.
+        self.liveness_detector = LivenessDetector(
+            config["liveness_threshold"],
+            config["liveness_warmup_seconds"],
+            config["liveness_window_seconds"],
+            config["ear_threshold"],
+            config.get("liveness_spoof_confirm_seconds", 4.0),
+        )
+        self.last_liveness_status = "NO_FACE"
+        self.last_liveness_score = 0.0
         self.attention = AttentionScorer(config["attention_rates"], config["attention_alpha"])
         self.buffer = TemporalBuffer(config["buffer_seconds"])
         self.pattern_detector = PatternDetector(
@@ -39,6 +52,9 @@ class StudentState:
         self.last_record = None
 
     def update(self, record, dt):
+        # carry the latest liveness verdict into every record (refreshed by
+        # check_liveness when a face is present; carried over otherwise)
+        record["liveness_status"] = self.last_liveness_status
         state = record["state"]
         _, display_score = self.attention.update(state, dt)
         record["attention_score"] = display_score
@@ -51,6 +67,19 @@ class StudentState:
         self.active_patterns = current_patterns
         self.last_record = record.copy()
         return display_score, patterns
+
+    def check_liveness(self, now, landmarks, ear, yaw, pitch):
+        """Update this student's liveness detector from the current face and
+        return the status ('CHECKING' / 'LIVE' / 'SPOOFING').
+
+        Identity is NOT checked here (that needs an enrolled ID + reference
+        image). Liveness only needs the face landmarks over time, so unlike
+        identity it can run for every tracked student in the video analyzer.
+        """
+        score, status = self.liveness_detector.update(now, landmarks, ear, yaw, pitch)
+        self.last_liveness_score = score
+        self.last_liveness_status = status
+        return status
 
     def state_contributions(self):
         """Return per-state duration and approximate score impact.

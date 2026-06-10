@@ -94,13 +94,19 @@ def build_timeline(rows, n_bins=60):
     scores_in = defaultdict(list)   # (s, b) -> [score,...]
     integ_in = defaultdict(list)    # (s, b) -> ["spoof"/"mismatch",...]
     bad_identity = {"MISMATCH", "UNKNOWN_ID", "NO_REFERENCE", "BLOCKED"}
+    # Identity verification only applies to students who were actually enrolled
+    # (an ID was entered and their face matched the reference at least once).
+    # Multi-student video mode has no enrollment, so an identity "mismatch"
+    # there is meaningless -- suppress identity markers unless the student
+    # verified at least once. Spoofing is unaffected (it needs no ID).
+    verified_students = {r["student"] for r in rows if r.get("identity") == "VERIFIED"}
     for r in rows:
         b = min(int((r["t"] - t_min) / width), n_bins - 1)
         states_in[(r["student"], b)].append(r["state"])
         scores_in[(r["student"], b)].append(r["score"])
         if r.get("liveness") == "SPOOFING":
             integ_in[(r["student"], b)].append("spoof")
-        elif r.get("identity") in bad_identity:
+        elif r.get("identity") in bad_identity and r["student"] in verified_students:
             integ_in[(r["student"], b)].append("mismatch")
 
     grid = {s: {} for s in students}
@@ -196,10 +202,16 @@ def per_student_stats(rows):
         n = len(items)
         bad_identity = {"MISMATCH", "UNKNOWN_ID", "NO_REFERENCE", "BLOCKED"}
         id_values = [x["identity"] for x in items if x.get("identity")]
+        # identity only applies if this student was enrolled & verified >=1 time
+        # (video mode has no enrollment -> identity is "not applicable", never a mismatch)
+        id_enrolled = any(x.get("identity") == "VERIFIED" for x in items)
         n_spoof = sum(1 for x in items if x.get("liveness") == "SPOOFING")
-        n_mismatch = sum(1 for x in items if x.get("identity") in bad_identity)
+        n_mismatch = (sum(1 for x in items if x.get("identity") in bad_identity)
+                      if id_enrolled else 0)
         has_integrity_data = bool(id_values) or any(x.get("liveness") for x in items)
-        if any(x.get("identity") == "MISMATCH" for x in items):
+        if not id_enrolled:
+            identity_verdict = ""                      # not applicable (e.g. video mode)
+        elif any(x.get("identity") == "MISMATCH" for x in items):
             identity_verdict = "MISMATCH"
         elif any(x.get("identity") in {"UNKNOWN_ID", "NO_REFERENCE"} for x in items):
             identity_verdict = "UNVERIFIED"

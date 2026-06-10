@@ -378,6 +378,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                     yaw, pitch, roll = head_pose.estimate(frame, landmarks)
                     ear, sleeping = students[track_id].eye_monitor.check(landmarks, timestamp)
                     mar, talking = students[track_id].mouth_monitor.check(landmarks, timestamp)
+                    students[track_id].check_liveness(timestamp, landmarks, ear, yaw, pitch)
                     state = classifier.classify(True, yaw, pitch, sleeping, talking)
                     if state == "DISTRACTED":
                         distraction_started_at.setdefault(track_id, timestamp)
@@ -502,6 +503,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                 yaw, pitch, roll = head_pose.estimate(frame, landmarks)
                 ear, sleeping = students[track_id].eye_monitor.check(landmarks, timestamp)
                 mar, talking = students[track_id].mouth_monitor.check(landmarks, timestamp)
+                students[track_id].check_liveness(timestamp, landmarks, ear, yaw, pitch)
                 state = classifier.classify(True, yaw, pitch, sleeping, talking)
                 if state == "DISTRACTED":
                     distraction_started_at.setdefault(track_id, timestamp)
@@ -618,6 +620,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
     detail_fields = [
         "timestamp", "student", "state", "ear", "mar", "yaw", "pitch",
         "roll", "attention_score", "phone_detected", "patterns",
+        "liveness_status",
     ]
     write_csv(detail_csv, detail_rows, detail_fields)
 
