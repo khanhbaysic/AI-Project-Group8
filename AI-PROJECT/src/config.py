@@ -88,8 +88,10 @@ CONFIG = {
     "liveness_window_seconds": 10.0,
     "liveness_spoof_confirm_seconds": 4.0,
 
-    "identity_similarity_threshold": 0.88,
+    "identity_similarity_threshold": 0.363,
     "identity_check_interval": 0.5,
+    "identity_detector_model": PROJECT_ROOT / "models" / "face_detection_yunet_2023mar.onnx",
+    "identity_recognizer_model": PROJECT_ROOT / "models" / "face_recognition_sface_2021dec.onnx",
 
     "database_csv": PROJECT_ROOT / "database" / "students.csv",
     "evidence_dir": PROJECT_ROOT / "evidence",

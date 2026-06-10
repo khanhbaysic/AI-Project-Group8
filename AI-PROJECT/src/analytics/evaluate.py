@@ -1,46 +1,46 @@
 """
-Evaluation Harness cho E-Proctoring System
-===========================================
+Evaluation Harness for the E-Proctoring System
+===============================================
 
-Tinh Precision / Recall / F1 cho TUNG trang thai + Confusion Matrix,
-bang cach so sanh:
-  - GROUND TRUTH (nhan tay cua nhom)  vs
-  - PREDICTION   (trang thai he thong xuat ra trong *_details.csv)
+Computes Precision / Recall / F1 for EACH state + a Confusion Matrix, by
+comparing:
+  - GROUND TRUTH (the team's manual labels)  vs
+  - PREDICTION   (the state the system wrote into *_details.csv)
 
-HO TRO 2 KIEU GAN NHAN (nhom chon 1 kieu, thong nhat ca nhom):
+SUPPORTS 2 LABELLING MODES (the team picks one and uses it consistently):
 
-  KIEU A - "mot nhan cho ca clip" (don gian nhat, khuyen dung cho 4/6):
-     File ground truth la CSV:
+  MODE A - "one label per clip" (simplest, recommended for 4/6):
+     The ground-truth file is a CSV:
          clip,true_state
          clip01,OK
          clip02,PHONE_USAGE
          ...
-     Va he thong tao 1 file *_details.csv cho moi clip. Khi do truyen
-     thu muc chua cac details + file nhan -> moi clip lay trang thai
-     pho bien nhat (mode) lam prediction.
+     The system produces one *_details.csv per clip. You pass the folder
+     containing the details + the label file -> each clip takes its most
+     frequent state (mode) as the prediction.
 
-  KIEU B - "nhan theo doan thoi gian" (chinh xac hon, cho ban cuoi):
-     File ground truth la CSV:
+  MODE B - "labels by time segment" (more precise, for the final version):
+     The ground-truth file is a CSV:
          student,start,end,true_state
          Student_1,0,5,OK
          Student_1,5,12,PHONE_USAGE
          ...
-     So khop voi tung dong trong *_details.csv theo (student, timestamp).
+     Matched against each row in *_details.csv by (student, timestamp).
 
-CACH CHAY:
+HOW TO RUN:
 
-  Kieu A:
+  Mode A:
      py -m src.analytics.evaluate --mode clip ^
         --labels labels_clip.csv --details-dir output/video_analysis
 
-  Kieu B:
+  Mode B:
      py -m src.analytics.evaluate --mode segment ^
         --labels labels_segment.csv --details output/video_analysis/classroom_test_details.csv
 
-Ket qua: in bang chi so ra man hinh + luu confusion_matrix.png va
+Result: prints the metrics table + saves confusion_matrix.png and
 evaluation_report.txt.
 
-Khong sua gi trong pipeline. Chi DOC file. Chi can matplotlib (tuy chon).
+Changes nothing in the pipeline. Only READS files. Needs matplotlib (optional).
 """
 
 import argparse
@@ -53,7 +53,7 @@ from src.states import EVAL_STATES as STATES
 
 
 # ---------------------------------------------------------------------------
-# Doc du lieu
+# Read data
 # ---------------------------------------------------------------------------
 
 def read_details(path):
@@ -69,7 +69,7 @@ def read_details(path):
 
 
 def collect_pairs_clip(labels_csv, details_dir):
-    """KIEU A: moi clip 1 nhan. Tra ve list (y_true, y_pred)."""
+    """MODE A: one label per clip. Return a list of (y_true, y_pred)."""
     details_dir = Path(details_dir)
     pairs = []
     missing = []
@@ -80,10 +80,10 @@ def collect_pairs_clip(labels_csv, details_dir):
             if not y_true:
                 missing.append(f"{clip} (missing true_state)")
                 continue
-            # tim file details tuong ung: <clip>_details.csv
+            # find the matching details file: <clip>_details.csv
             cand = details_dir / f"{clip}_details.csv"
             if not cand.exists():
-                # thu tim file chua ten clip
+                # otherwise look for a file containing the clip name
                 hits = list(details_dir.glob(f"*{clip}*details*.csv"))
                 if hits:
                     cand = hits[0]
@@ -101,8 +101,8 @@ def collect_pairs_clip(labels_csv, details_dir):
 
 
 def collect_pairs_segment(labels_csv, details_csv):
-    """KIEU B: nhan theo (student, start-end). Match tung dong details."""
-    # doc nhan thanh dict: student -> list (start,end,state)
+    """MODE B: labels by (student, start-end). Match each details row."""
+    # read labels into a dict: student -> list of (start,end,state)
     segs = defaultdict(list)
     with open(labels_csv, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -134,7 +134,7 @@ def collect_pairs_segment(labels_csv, details_csv):
 
 
 # ---------------------------------------------------------------------------
-# Tinh chi so
+# Compute metrics
 # ---------------------------------------------------------------------------
 
 def confusion(pairs, labels):
@@ -163,8 +163,8 @@ def metrics_per_class(M, labels):
         out[lab] = {"precision": prec, "recall": rec, "f1": f1,
                     "support": support}
     accuracy = correct / total if total else 0.0
-    # macro avg chi tinh tren cac lop co ground-truth label.
-    # Cac lop support=0 van duoc in trong report de thay ro test set con thieu.
+    # macro avg is computed only over classes that have a ground-truth label.
+    # support=0 classes are still printed so the missing test set is visible.
     present = [l for l in labels if out[l]["support"] > 0]
     macro = {
         "precision": sum(out[l]["precision"] for l in present) / len(present) if present else 0,
@@ -180,23 +180,23 @@ def missing_ground_truth_states(per_class, labels):
 
 
 # ---------------------------------------------------------------------------
-# Xuat ket qua
+# Output results
 # ---------------------------------------------------------------------------
 
 def format_report(per_class, accuracy, macro, total, labels):
     missing = missing_ground_truth_states(per_class, labels)
     lines = []
     lines.append("=" * 64)
-    lines.append(" BAO CAO DANH GIA (EVALUATION REPORT)")
+    lines.append(" EVALUATION REPORT")
     lines.append("=" * 64)
-    lines.append(f" Tong so mau (samples): {total}")
+    lines.append(f" Total samples        : {total}")
     lines.append(f" Accuracy             : {accuracy*100:.2f}%")
     lines.append(
         " States without ground-truth labels: "
         + (", ".join(missing) if missing else "None")
     )
     lines.append("-" * 64)
-    lines.append(f" {'Trang thai':<14}{'Precision':>10}{'Recall':>10}"
+    lines.append(f" {'State':<14}{'Precision':>10}{'Recall':>10}"
                  f"{'F1':>8}{'Support':>9}")
     lines.append("-" * 64)
     for lab in labels:
@@ -239,8 +239,8 @@ def save_confusion_png(M, labels, out_path):
     ax.set_yticks(range(len(labs)))
     ax.set_xticklabels(labs, rotation=45, ha="right", color="#e2e8f0", fontsize=9)
     ax.set_yticklabels(labs, color="#e2e8f0", fontsize=9)
-    ax.set_xlabel("Du doan (Predicted)", color="#e2e8f0")
-    ax.set_ylabel("Thuc te (Ground truth)", color="#e2e8f0")
+    ax.set_xlabel("Predicted", color="#e2e8f0")
+    ax.set_ylabel("Ground truth", color="#e2e8f0")
     ax.set_title("Confusion Matrix", color="#38bdf8", fontweight="bold", pad=12)
     mx = data.max() if data.max() > 0 else 1
     for i in range(len(labs)):
@@ -264,28 +264,28 @@ def save_confusion_png(M, labels, out_path):
 def main():
     ap = argparse.ArgumentParser(description="Evaluation harness e-proctoring")
     ap.add_argument("--mode", choices=["clip", "segment"], required=True)
-    ap.add_argument("--labels", required=True, help="File CSV nhan ground truth")
-    ap.add_argument("--details-dir", help="(mode clip) thu muc chua *_details.csv")
-    ap.add_argument("--details", help="(mode segment) duong dan 1 file *_details.csv")
-    ap.add_argument("--out-dir", default=".", help="Thu muc luu ket qua")
+    ap.add_argument("--labels", required=True, help="Ground-truth label CSV file")
+    ap.add_argument("--details-dir", help="(clip mode) folder containing *_details.csv")
+    ap.add_argument("--details", help="(segment mode) path to one *_details.csv file")
+    ap.add_argument("--out-dir", default=".", help="Folder to save results")
     args = ap.parse_args()
 
     if args.mode == "clip":
         if not args.details_dir:
-            ap.error("mode clip can --details-dir")
+            ap.error("clip mode needs --details-dir")
         pairs, info = collect_pairs_clip(args.labels, args.details_dir)
         if info:
-            print(f"[CANH BAO] Khong tim thay details cho clip: {info}")
+            print(f"[WARNING] Could not find details for clips: {info}")
     else:
         if not args.details:
-            ap.error("mode segment can --details")
+            ap.error("segment mode needs --details")
         pairs, info = collect_pairs_segment(args.labels, args.details)
         if info:
-            print(f"[INFO] So dong details khong khop nhan: {info}")
+            print(f"[INFO] Details rows not matching any label: {info}")
 
     if not pairs:
-        print("[LOI] Khong co cap (true,pred) nao. Kiem tra lai file nhan.")
-        print("      Neu file duoc tao tu make_label_template.py, hay dien cot true_state truoc.")
+        print("[ERROR] No (true,pred) pairs found. Check the label file.")
+        print("      If the file came from make_label_template.py, fill the true_state column first.")
         sys.exit(1)
 
     M = confusion(pairs, STATES)
@@ -303,8 +303,8 @@ def main():
     (out_dir / "evaluation_report.txt").write_text(report, encoding="utf-8")
     png = out_dir / "confusion_matrix.png"
     if save_confusion_png(M, STATES, png):
-        print(f"\n[OK] Da luu confusion matrix: {png}")
-    print(f"[OK] Da luu bao cao text   : {out_dir / 'evaluation_report.txt'}")
+        print(f"\n[OK] Saved confusion matrix: {png}")
+    print(f"[OK] Saved text report     : {out_dir / 'evaluation_report.txt'}")
 
 
 if __name__ == "__main__":

@@ -86,7 +86,12 @@ def run():
         CONFIG["ear_threshold"],
         CONFIG.get("liveness_spoof_confirm_seconds", 4.0),
     )
-    identity_verifier = IdentityVerifier(face_detector, CONFIG["identity_similarity_threshold"])
+    identity_verifier = IdentityVerifier(
+         CONFIG["identity_detector_model"],
+         CONFIG["identity_recognizer_model"],
+         threshold=CONFIG["identity_similarity_threshold"],
+         check_interval=CONFIG.get("identity_check_interval", 0.5),
+     )
     attention = AttentionScorer(CONFIG["attention_rates"], CONFIG["attention_alpha"])
     buffer = TemporalBuffer(CONFIG["buffer_seconds"])
     pattern_detector = PatternDetector(
@@ -280,7 +285,7 @@ def run():
                 identity_status = "BLOCKED"
                 face_similarity = 0.0
             else:
-                identity_result = identity_verifier.verify(landmarks)
+                identity_result = identity_verifier.verify(frame, now)
                 identity_status = identity_result.status
                 face_similarity = identity_result.similarity
 

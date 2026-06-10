@@ -2,23 +2,23 @@
 Privacy-First Session Analytics for the E-Proctoring System
 ============================================================
 
-Hau-buoi-hoc (post-session) analytics. Doc file *_details.csv ma
-video_analyzer da xuat ra, KHONG dung anh khuon mat, chi dung du lieu hinh
-hoc (EAR / MAR / Yaw / state / attention_score) -> tao ra:
+Post-session analytics. Reads the *_details.csv files that video_analyzer
+produced; it uses NO face images, only geometric data
+(EAR / MAR / Yaw / state / attention_score) to produce:
 
-  1) class_attention_heatmap.png  : Heatmap chu y ca lop theo thoi gian
-                                     (truc X = thoi gian, truc Y = sinh vien)
-  2) session_report.html          : Bao cao privacy-first, khong co anh mat,
-                                     chi co bieu do + so lieu hinh hoc.
+  1) class_attention_heatmap.png  : Class attention heatmap over time
+                                     (X axis = time, Y axis = students)
+  2) session_report.html          : Privacy-first report, no face images,
+                                     only charts + geometric statistics.
 
-CACH CHAY:
+HOW TO RUN:
     python -m src.analytics.session_report output/video_analysis/classroom_test_details.csv
 
-Module nay HOAN TOAN DOC LAP voi pipeline real-time. No chi DOC file CSV,
-khong sua gi trong main.py / video_analyzer.py.
+This module is FULLY INDEPENDENT of the real-time pipeline. It only READS the
+CSV file; it changes nothing in main.py / video_analyzer.py.
 
-Khong can thu vien ngoai (chi dung chuan + matplotlib neu co; neu khong co
-matplotlib van tao duoc heatmap SVG thuan tuy bang HTML).
+No external libraries required (only the standard library + matplotlib if
+available; without matplotlib it still renders a pure-HTML/SVG heatmap).
 """
 
 import csv
@@ -31,25 +31,25 @@ from pathlib import Path
 from src.config import CONFIG
 from src.states import (
     OK, BODY_ONLY, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT,
-    ALL_STATES, LABEL_VI, STATE_COLORS,
+    ALL_STATES, LABEL_EN, STATE_COLORS,
 )
 
 
 # ---------------------------------------------------------------------------
-# Cau hinh mau & nhan trang thai  (de chinh sua tap trung mot cho)
+# Color config & state labels (single place to tweak)
 # ---------------------------------------------------------------------------
 
 STATE_ORDER = ALL_STATES
 
-STATE_LABEL_VI = LABEL_VI
+STATE_LABEL = LABEL_EN
 
 
 # ---------------------------------------------------------------------------
-# 1. Doc va gom du lieu tu file details.csv
+# 1. Read and aggregate data from the details.csv file
 # ---------------------------------------------------------------------------
 
 def load_details(csv_path):
-    """Doc CSV chi tiet. Tra ve list cac dict da ep kieu so."""
+    """Read the details CSV. Return a list of dicts with numeric fields."""
     rows = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -73,10 +73,10 @@ def load_details(csv_path):
 
 def build_timeline(rows, n_bins=60):
     """
-    Chia thoi gian thanh n_bins o. Voi moi (sinh vien, o thoi gian) lay
-    trang thai xuat hien nhieu nhat (mode) -> luoi de ve heatmap.
-    Tra ve: students(list), bins(list bien thoi gian), grid[student][bin]=state,
-    va score_grid[student][bin]=diem chu y trung binh.
+    Split the time span into n_bins. For each (student, time bin) take the
+    most frequent state (mode) -> a grid used to draw the heatmap.
+    Returns: students(list), bins(list of time edges), grid[student][bin]=state,
+    and score_grid[student][bin]=average attention score.
     """
     if not rows:
         return [], [], {}, {}
@@ -87,7 +87,7 @@ def build_timeline(rows, n_bins=60):
     span = max(t_max - t_min, 1e-6)
     width = span / n_bins
 
-    # gom theo (student, bin)
+    # group by (student, bin)
     states_in = defaultdict(list)   # (s, b) -> [state,...]
     scores_in = defaultdict(list)   # (s, b) -> [score,...]
     for r in rows:
@@ -101,12 +101,12 @@ def build_timeline(rows, n_bins=60):
         for b in range(n_bins):
             sts = states_in.get((s, b))
             if sts:
-                # trang thai xuat hien nhieu nhat trong o nay
+                # most frequent state in this bin
                 grid[s][b] = max(set(sts), key=sts.count)
                 sc = scores_in[(s, b)]
                 score_grid[s][b] = sum(sc) / len(sc)
             else:
-                grid[s][b] = None          # khong co du lieu
+                grid[s][b] = None          # no data
                 score_grid[s][b] = None
 
     bins = [t_min + (i + 0.5) * width for i in range(n_bins)]
@@ -114,7 +114,7 @@ def build_timeline(rows, n_bins=60):
 
 
 # ---------------------------------------------------------------------------
-# 2. Tinh thong ke tom tat cho moi sinh vien (privacy-safe: chi so, khong anh)
+# 2. Compute summary stats per student (privacy-safe: numbers only, no images)
 # ---------------------------------------------------------------------------
 
 def estimate_state_seconds(items):
@@ -173,7 +173,7 @@ def per_student_stats(rows):
         dist = {k: state_seconds[k] / total for k in state_seconds}
         final_score = items[-1]["score"]
         avg_score = sum(x["score"] for x in items) / len(items)
-        # ti le tap trung = % thoi gian o trang thai OK
+        # focus ratio = % of time spent in the OK state
         focus_pct = dist.get(OK, 0.0) * 100
         flags = sorted({x["patterns"] for x in items if x["patterns"]})
         phone = any(x["phone"] for x in items)
@@ -194,7 +194,7 @@ def per_student_stats(rows):
 
 
 # ---------------------------------------------------------------------------
-# 3. Ve heatmap PNG bang matplotlib (neu co). Khong co thi bo qua, HTML tu ve.
+# 3. Render heatmap PNG with matplotlib (if available). Else skip; HTML self-draws.
 # ---------------------------------------------------------------------------
 
 def render_heatmap_png(students, bins, grid, out_path):
@@ -204,7 +204,7 @@ def render_heatmap_png(students, bins, grid, out_path):
         import matplotlib.pyplot as plt
         from matplotlib.patches import Patch
     except Exception:
-        return False  # khong co matplotlib -> HTML se tu ve heatmap
+        return False  # no matplotlib -> HTML will draw the heatmap itself
 
     state_idx = {st: i for i, st in enumerate(STATE_ORDER)}
     import numpy as np
@@ -231,13 +231,13 @@ def render_heatmap_png(students, bins, grid, out_path):
     xticks = list(range(0, n_b, max(1, n_b // 8)))
     ax.set_xticks(xticks)
     ax.set_xticklabels([f"{bins[i]:.0f}s" for i in xticks], color="#94a3b8")
-    ax.set_xlabel("Thoi gian buoi hoc", color="#e2e8f0", fontsize=12)
-    ax.set_title("HEATMAP CHU Y CA LOP  (privacy-first, khong dung anh mat)",
+    ax.set_xlabel("Session time", color="#e2e8f0", fontsize=12)
+    ax.set_title("CLASS ATTENTION HEATMAP  (privacy-first, no face images)",
                  color="#38bdf8", fontsize=14, pad=14, fontweight="bold")
     for spine in ax.spines.values():
         spine.set_color("#1e293b")
 
-    legend = [Patch(facecolor=STATE_COLORS[s], label=STATE_LABEL_VI[s])
+    legend = [Patch(facecolor=STATE_COLORS[s], label=STATE_LABEL[s])
               for s in STATE_ORDER]
     ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.18),
               ncol=4, facecolor="#0b1220", edgecolor="#1e293b",
@@ -249,7 +249,7 @@ def render_heatmap_png(students, bins, grid, out_path):
 
 
 # ---------------------------------------------------------------------------
-# 4. Sinh bao cao HTML privacy-first (tu ve heatmap bang div neu thieu PNG)
+# 4. Build the privacy-first HTML report (draws heatmap with divs if PNG missing)
 # ---------------------------------------------------------------------------
 
 def render_html(students, bins, grid, score_grid, stats,
@@ -260,13 +260,13 @@ def render_html(students, bins, grid, score_grid, stats,
             return "#0b1220"
         return STATE_COLORS.get(state, "#334155")
 
-    # luoi heatmap thuan HTML (luon co, du co PNG hay khong)
+    # pure-HTML heatmap grid (always present, with or without PNG)
     rows_html = []
     for s in students:
         cells = "".join(
             f'<div class="cell" style="background:{cell(grid[s].get(b))}" '
             f'title="{html.escape(s)} | {bins[b]:.1f}s | '
-            f'{STATE_LABEL_VI.get(grid[s].get(b) or "", "khong co du lieu")}"></div>'
+            f'{STATE_LABEL.get(grid[s].get(b) or "", "no data")}"></div>'
             for b in range(len(bins))
         )
         label_score = stats.get(s, {}).get("final_score", 0)
@@ -313,15 +313,15 @@ def render_html(students, bins, grid, score_grid, stats,
                   <polyline points="{path}" class="score-line"/>
                 </svg>
               </div>""")
-    timeline_html = "\n".join(timeline_cards) or '<p class="empty">Khong co du lieu attention timeline.</p>'
+    timeline_html = "\n".join(timeline_cards) or '<p class="empty">No attention timeline data.</p>'
 
     legend_html = "".join(
         f'<span class="lg"><i style="background:{STATE_COLORS[s]}"></i>'
-        f'{STATE_LABEL_VI[s]}</span>'
+        f'{STATE_LABEL[s]}</span>'
         for s in STATE_ORDER
     )
 
-    # the thong ke tung sinh vien
+    # per-student stat cards
     cards = []
     for s in students:
         st = stats[s]
@@ -329,7 +329,7 @@ def render_html(students, bins, grid, score_grid, stats,
         ring = ("#22c55e" if score >= 70 else
                 "#f59e0b" if score >= 40 else "#ef4444")
         bars = "".join(
-            f'<div class="bar"><span>{STATE_LABEL_VI.get(k, k)}</span>'
+            f'<div class="bar"><span>{STATE_LABEL.get(k, k)}</span>'
             f'<div class="bar-track"><div class="bar-fill" '
             f'style="width:{v*100:.0f}%;background:{STATE_COLORS.get(k,"#64748b")}">'
             f'</div></div><b>{v*100:.0f}%</b></div>'
@@ -341,20 +341,20 @@ def render_html(students, bins, grid, score_grid, stats,
                      "".join(f'<span class="flag">{html.escape(f)}</span>'
                              for f in st["flags"]) + "</div>")
         if st["phone"]:
-            flags += '<div class="flags"><span class="flag phone">Phat hien dien thoai</span></div>'
+            flags += '<div class="flags"><span class="flag phone">Phone detected</span></div>'
         impact_rows = "".join(
-            f'<div class="impact-row"><span>{STATE_LABEL_VI.get(row["state"], row["state"])}</span>'
+            f'<div class="impact-row"><span>{STATE_LABEL.get(row["state"], row["state"])}</span>'
             f'<b>{row["seconds"]:.1f}s</b><b>{row["rate"]:+.1f}/s</b>'
             f'<strong class="{("pos" if row["impact"] >= 0 else "neg")}">{row["impact"]:+.1f}</strong></div>'
             for row in st["contributions"]
         )
         if not impact_rows:
-            impact_rows = '<div class="impact-row"><span>Khong co du lieu</span><b>0.0s</b><b>+0.0/s</b><strong>+0.0</strong></div>'
+            impact_rows = '<div class="impact-row"><span>No data</span><b>0.0s</b><b>+0.0/s</b><strong>+0.0</strong></div>'
         impact_total_class = "pos" if st["impact_total"] >= 0 else "neg"
         impact_html = f"""
           <div class="impact">
             <div class="impact-title">
-              <span>Dong gop diem</span>
+              <span>Score contribution</span>
               <strong class="{impact_total_class}">{st['impact_total']:+.1f}</strong>
             </div>
             {impact_rows}
@@ -367,8 +367,8 @@ def render_html(students, bins, grid, score_grid, stats,
             </div>
             <div>
               <h3>{html.escape(s)}</h3>
-              <p>{st['duration']:.1f}s &middot; chu y TB {st['avg_score']:.0f}
-                 &middot; tap trung {st['focus_pct']:.0f}%</p>
+              <p>{st['duration']:.1f}s &middot; avg attention {st['avg_score']:.0f}
+                 &middot; focus {st['focus_pct']:.0f}%</p>
             </div>
           </div>
           <div class="bars">{bars}</div>
@@ -381,7 +381,7 @@ def render_html(students, bins, grid, score_grid, stats,
     if png_ok:
         png_block = (
             '<div class="png-wrap"><img src="class_attention_heatmap.png" '
-            'alt="Heatmap chu y ca lop"></div>'
+            'alt="Class attention heatmap"></div>'
         )
 
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -413,11 +413,11 @@ def _write(path, text):
 # ---------------------------------------------------------------------------
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bao cao phien giam sat - Privacy First</title>
+<title>Monitoring Session Report - Privacy First</title>
 <style>
   :root {{ --bg:#0b1220; --panel:#0f1a2e; --line:#1e293b; --ink:#e2e8f0;
            --mut:#94a3b8; --accent:#38bdf8; }}
@@ -516,18 +516,18 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <span class="badge">&#128274; Privacy-First &middot; Khong luu anh khuon mat</span>
-  <h1>Bao cao phien giam sat lop hoc</h1>
-  <p class="sub">Nguon du lieu: {source} &middot; Tao luc {now}</p>
+  <span class="badge">&#128274; Privacy-First &middot; No face images stored</span>
+  <h1>Classroom Monitoring Session Report</h1>
+  <p class="sub">Data source: {source} &middot; Generated {now}</p>
 
   <div class="meta">
-    <div><b>{n_students}</b><span>Sinh vien duoc theo doi</span></div>
-    <div><b>{span}s</b><span>Thoi luong phan tich</span></div>
-    <div><b>0</b><span>Anh khuon mat luu tru</span></div>
+    <div><b>{n_students}</b><span>Students monitored</span></div>
+    <div><b>{span}s</b><span>Analysis duration</span></div>
+    <div><b>0</b><span>Face images stored</span></div>
   </div>
 
   <section>
-    <h2>Heatmap chu y ca lop theo thoi gian</h2>
+    <h2>Class attention heatmap over time</h2>
     <div class="legend">{legend}</div>
     <div class="hm">
       {heatmap}
@@ -536,29 +536,29 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   </section>
 
   <section>
-    <h2>Attention score theo thoi gian</h2>
+    <h2>Attention score over time</h2>
     <div class="timeline-grid">
       {timeline}
     </div>
   </section>
 
   <section>
-    <h2>Phan tich tung sinh vien</h2>
+    <h2>Per-student analysis</h2>
     <div class="grid">
       {cards}
     </div>
   </section>
 
   <div class="note">
-    <b>Nguyen tac Privacy-First:</b> Bao cao nay duoc tao hoan toan tu du lieu
-    hinh hoc (goc dau Yaw/Pitch, ti le mat EAR, ti le mieng MAR, trang thai
-    hanh vi). KHONG co khung hinh goc hay anh khuon mat nao duoc luu lam bang
-    chung. Giao vien van nam duoc ai mat tap trung vao luc nao, nhung danh tinh
-    truc quan cua sinh vien khong bi luu tru &mdash; giam thieu rui ro lo lot
-    du lieu sinh trac hoc.
+    <b>Privacy-First principle:</b> This report is generated entirely from
+    geometric data (head pose Yaw/Pitch, eye ratio EAR, mouth ratio MAR,
+    behavioral state). NO original frames or face images are stored as
+    evidence. The instructor can still see who was inattentive and when, but
+    students' visual identity is not retained &mdash; minimizing the risk of
+    leaking biometric data.
   </div>
 
-  <footer>E-Proctoring System &middot; Nhom 8 &middot; Module phan tich hau-buoi-hoc</footer>
+  <footer>E-Proctoring System &middot; Group 8 &middot; Post-session analytics module</footer>
 </div>
 </body>
 </html>"""
@@ -577,7 +577,7 @@ def generate(details_csv, out_dir=None):
 
     rows = load_details(details_csv)
     if not rows:
-        print("[LOI] Khong doc duoc du lieu tu", details_csv)
+        print("[ERROR] Could not read data from", details_csv)
         return
 
     students, bins, grid, score_grid = build_timeline(rows, n_bins=60)
@@ -591,18 +591,18 @@ def generate(details_csv, out_dir=None):
                 details_csv.name, png_ok, html_path)
 
     print("=" * 56)
-    print(" BAO CAO PRIVACY-FIRST DA TAO XONG")
+    print(" PRIVACY-FIRST REPORT GENERATED")
     print("=" * 56)
-    print(f" Sinh vien    : {len(students)}")
-    print(f" Heatmap PNG  : {'co' if png_ok else 'bo qua (thieu matplotlib)'}")
-    print(f" Bao cao HTML : {html_path}")
+    print(f" Students     : {len(students)}")
+    print(f" Heatmap PNG  : {'yes' if png_ok else 'skipped (matplotlib missing)'}")
+    print(f" HTML report  : {html_path}")
     if png_ok:
-        print(f" Anh heatmap  : {png_path}")
+        print(f" Heatmap image: {png_path}")
     print("=" * 56)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Cach dung: python -m src.analytics.session_report <details.csv>")
+        print("Usage: python -m src.analytics.session_report <details.csv>")
         sys.exit(1)
     generate(sys.argv[1])

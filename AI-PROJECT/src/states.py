@@ -28,20 +28,6 @@ ALL_STATES = [OK, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT, BODY_ONLY]
 # Same order expected by evaluate.py
 EVAL_STATES = [OK, DISTRACTED, TALKING, SLEEPING, ABSENT, PHONE_USAGE, BODY_ONLY]
 
-# ---------------------------------------------------------------------------
-# Human-readable labels (Vietnamese, matching the existing session report)
-# ---------------------------------------------------------------------------
-
-LABEL_VI = {
-    OK:          "Tap trung",
-    BODY_ONLY:   "Khong ro mat",
-    DISTRACTED:  "Mat tap trung",
-    TALKING:     "Noi chuyen",
-    PHONE_USAGE: "Dung dien thoai",
-    SLEEPING:    "Ngu gat",
-    ABSENT:      "Vang mat",
-}
-
 # Human-readable labels (English)
 LABEL_EN = {
     OK:          "Focused",

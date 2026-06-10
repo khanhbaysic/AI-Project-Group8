@@ -7,14 +7,14 @@ import cv2
 
 
 class AlertSystem:
-    """Ghi nhan vi pham + luu bang chung.
+    """Record violations + save evidence.
 
-    THEM MOI: che do privacy. Khi privacy_mode=True, anh bang chung se
-    duoc LAM MO vung khuon mat (hoac toan khung neu khong co bbox) truoc
-    khi luu -> giam rui ro lo du lieu sinh trac hoc. Mac dinh privacy_mode
-    =False de GIU NGUYEN hanh vi cu (khong lam vo gi dang chay).
+    NEW: privacy mode. When privacy_mode=True, the evidence image has its
+    face region BLURRED (or the whole frame if no bbox) before it is
+    saved -> reducing the risk of leaking biometric data. privacy_mode
+    defaults to False to KEEP the old behaviour (nothing running breaks).
 
-    privacy_blur_strength: do mo (so le, cang lon cang mo). 35 la vua.
+    privacy_blur_strength: blur amount (odd; larger = blurrier). 35 is fine.
     """
 
     def __init__(self, csv_path: Path, image_dir: Path, cooldown_seconds=5.0,
@@ -37,15 +37,15 @@ class AlertSystem:
                 ])
 
     def _blur_face(self, image, bbox):
-        """Lam mo vung khuon mat. bbox = (x, y, w, h) hoac None.
+        """Blur the face region. bbox = (x, y, w, h) or None.
 
-        Neu khong co bbox -> lam mo toan khung (an toan ve privacy).
-        Tra ve anh moi, KHONG sua anh goc.
+        If there is no bbox -> blur the whole frame (privacy-safe).
+        Returns a new image; does NOT modify the original.
         """
         out = image.copy()
         k = self.privacy_blur_strength
         if k % 2 == 0:
-            k += 1  # gaussian kernel phai la so le
+            k += 1  # gaussian kernel must be odd
 
         if bbox is not None:
             x, y, w, h = (int(v) for v in bbox)
@@ -54,7 +54,7 @@ class AlertSystem:
             y2 = min(out.shape[0], y + h)
             if x2 > x and y2 > y:
                 roi = out[y:y2, x:x2]
-                # mo manh: blur nhieu lan cho mat hoan toan
+                # strong blur: blur several times to fully obscure
                 roi = cv2.GaussianBlur(roi, (k, k), 0)
                 roi = cv2.GaussianBlur(roi, (k, k), 0)
                 out[y:y2, x:x2] = roi
@@ -63,16 +63,16 @@ class AlertSystem:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
                 return out
 
-        # khong co bbox -> mo toan khung
+        # no bbox -> blur the whole frame
         out = cv2.GaussianBlur(out, (k, k), 0)
         cv2.putText(out, "PRIVACY MODE", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
         return out
 
     def trigger(self, alert_type, frame, record, face_bbox=None):
-        """Ghi vi pham. face_bbox la tham so MOI (tuy chon) de biet vung
-        mat can lam mo khi o che do privacy. Goi cu khong truyen face_bbox
-        van chay binh thuong."""
+        """Record a violation. face_bbox is a NEW (optional) parameter telling
+        which face region to blur in privacy mode. Old calls without face_bbox
+        still work normally."""
         now = time.time()
         last = self.last_trigger.get(alert_type, 0.0)
         if now - last < self.cooldown_seconds:
@@ -84,7 +84,7 @@ class AlertSystem:
         suffix = "_priv" if self.privacy_mode else ""
         image_path = self.image_dir / f"{safe_type}_{timestamp}{suffix}.jpg"
 
-        # tao anh bang chung
+        # create the evidence image
         if self.privacy_mode:
             evidence = self._blur_face(frame, face_bbox)
         else:
