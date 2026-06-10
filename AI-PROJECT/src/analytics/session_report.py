@@ -65,6 +65,8 @@ def load_details(csv_path):
                     "score": float(r.get("attention_score", 100) or 100),
                     "phone": str(r.get("phone_detected", "")).lower() == "true",
                     "patterns": (r.get("patterns") or "").strip(),
+                    "identity": (r.get("identity_status") or "").strip(),
+                    "liveness": (r.get("liveness_status") or "").strip(),
                 })
             except ValueError:
                 continue
@@ -79,7 +81,7 @@ def build_timeline(rows, n_bins=60):
     and score_grid[student][bin]=average attention score.
     """
     if not rows:
-        return [], [], {}, {}
+        return [], [], {}, {}, {}
 
     students = sorted({r["student"] for r in rows})
     t_min = min(r["t"] for r in rows)
@@ -90,13 +92,20 @@ def build_timeline(rows, n_bins=60):
     # group by (student, bin)
     states_in = defaultdict(list)   # (s, b) -> [state,...]
     scores_in = defaultdict(list)   # (s, b) -> [score,...]
+    integ_in = defaultdict(list)    # (s, b) -> ["spoof"/"mismatch",...]
+    bad_identity = {"MISMATCH", "UNKNOWN_ID", "NO_REFERENCE", "BLOCKED"}
     for r in rows:
         b = min(int((r["t"] - t_min) / width), n_bins - 1)
         states_in[(r["student"], b)].append(r["state"])
         scores_in[(r["student"], b)].append(r["score"])
+        if r.get("liveness") == "SPOOFING":
+            integ_in[(r["student"], b)].append("spoof")
+        elif r.get("identity") in bad_identity:
+            integ_in[(r["student"], b)].append("mismatch")
 
     grid = {s: {} for s in students}
     score_grid = {s: {} for s in students}
+    integ_grid = {s: {} for s in students}
     for s in students:
         for b in range(n_bins):
             sts = states_in.get((s, b))
@@ -108,9 +117,13 @@ def build_timeline(rows, n_bins=60):
             else:
                 grid[s][b] = None          # no data
                 score_grid[s][b] = None
+            # integrity flag for this bin (spoofing takes priority over mismatch)
+            ig = integ_in.get((s, b))
+            integ_grid[s][b] = ("spoof" if ig and "spoof" in ig
+                                else "mismatch" if ig else None)
 
     bins = [t_min + (i + 0.5) * width for i in range(n_bins)]
-    return students, bins, grid, score_grid
+    return students, bins, grid, score_grid, integ_grid
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +191,25 @@ def per_student_stats(rows):
         flags = sorted({x["patterns"] for x in items if x["patterns"]})
         phone = any(x["phone"] for x in items)
         contributions = score_contributions(state_seconds)
+
+        # identity / liveness integrity (orthogonal to behavioural state)
+        n = len(items)
+        bad_identity = {"MISMATCH", "UNKNOWN_ID", "NO_REFERENCE", "BLOCKED"}
+        id_values = [x["identity"] for x in items if x.get("identity")]
+        n_spoof = sum(1 for x in items if x.get("liveness") == "SPOOFING")
+        n_mismatch = sum(1 for x in items if x.get("identity") in bad_identity)
+        has_integrity_data = bool(id_values) or any(x.get("liveness") for x in items)
+        if any(x.get("identity") == "MISMATCH" for x in items):
+            identity_verdict = "MISMATCH"
+        elif any(x.get("identity") in {"UNKNOWN_ID", "NO_REFERENCE"} for x in items):
+            identity_verdict = "UNVERIFIED"
+        elif id_values and all(v == "VERIFIED" for v in id_values):
+            identity_verdict = "VERIFIED"
+        elif id_values:
+            identity_verdict = "MIXED"
+        else:
+            identity_verdict = ""
+
         stats[s] = {
             "duration": dur,
             "final_score": final_score,
@@ -189,6 +221,12 @@ def per_student_stats(rows):
             "impact_total": sum(x["impact"] for x in contributions),
             "flags": flags,
             "phone": phone,
+            "has_integrity_data": has_integrity_data,
+            "identity_verdict": identity_verdict,
+            "n_spoof": n_spoof,
+            "n_mismatch": n_mismatch,
+            "spoof_seconds": dur * (n_spoof / n) if n else 0.0,
+            "mismatch_seconds": dur * (n_mismatch / n) if n else 0.0,
         }
     return stats
 
@@ -197,12 +235,13 @@ def per_student_stats(rows):
 # 3. Render heatmap PNG with matplotlib (if available). Else skip; HTML self-draws.
 # ---------------------------------------------------------------------------
 
-def render_heatmap_png(students, bins, grid, out_path):
+def render_heatmap_png(students, bins, grid, integ_grid, out_path):
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from matplotlib.patches import Patch
+        from matplotlib.lines import Line2D
     except Exception:
         return False  # no matplotlib -> HTML will draw the heatmap itself
 
@@ -226,6 +265,19 @@ def render_heatmap_png(students, bins, grid, out_path):
     ax.set_facecolor("#0b1220")
     ax.imshow(data, aspect="auto", cmap=cmap, norm=norm, interpolation="nearest")
 
+    # overlay integrity markers: spoofing (white X) and identity mismatch (yellow square)
+    spoof_pts = [(b, si) for si, s in enumerate(students)
+                 for b in range(n_b) if integ_grid.get(s, {}).get(b) == "spoof"]
+    mismatch_pts = [(b, si) for si, s in enumerate(students)
+                    for b in range(n_b) if integ_grid.get(s, {}).get(b) == "mismatch"]
+    if spoof_pts:
+        ax.scatter([p[0] for p in spoof_pts], [p[1] for p in spoof_pts],
+                   marker="x", c="#ffffff", s=42, linewidths=1.6, zorder=3)
+    if mismatch_pts:
+        ax.scatter([p[0] for p in mismatch_pts], [p[1] for p in mismatch_pts],
+                   marker="s", facecolors="none", edgecolors="#fde047",
+                   s=46, linewidths=1.6, zorder=3)
+
     ax.set_yticks(range(len(students)))
     ax.set_yticklabels(students, color="#e2e8f0", fontsize=11)
     xticks = list(range(0, n_b, max(1, n_b // 8)))
@@ -239,6 +291,13 @@ def render_heatmap_png(students, bins, grid, out_path):
 
     legend = [Patch(facecolor=STATE_COLORS[s], label=STATE_LABEL[s])
               for s in STATE_ORDER]
+    if spoof_pts:
+        legend.append(Line2D([0], [0], marker="x", color="#ffffff", linestyle="None",
+                             markersize=8, markeredgewidth=1.6, label="Spoofing"))
+    if mismatch_pts:
+        legend.append(Line2D([0], [0], marker="s", markerfacecolor="none",
+                             markeredgecolor="#fde047", color="#fde047",
+                             linestyle="None", markersize=8, label="Identity mismatch"))
     ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.18),
               ncol=4, facecolor="#0b1220", edgecolor="#1e293b",
               labelcolor="#e2e8f0", fontsize=9)
@@ -252,7 +311,7 @@ def render_heatmap_png(students, bins, grid, out_path):
 # 4. Build the privacy-first HTML report (draws heatmap with divs if PNG missing)
 # ---------------------------------------------------------------------------
 
-def render_html(students, bins, grid, score_grid, stats,
+def render_html(students, bins, grid, score_grid, integ_grid, stats,
                 source_name, png_ok, out_path):
 
     def cell(state):
@@ -263,12 +322,20 @@ def render_html(students, bins, grid, score_grid, stats,
     # pure-HTML heatmap grid (always present, with or without PNG)
     rows_html = []
     for s in students:
-        cells = "".join(
-            f'<div class="cell" style="background:{cell(grid[s].get(b))}" '
-            f'title="{html.escape(s)} | {bins[b]:.1f}s | '
-            f'{STATE_LABEL.get(grid[s].get(b) or "", "no data")}"></div>'
-            for b in range(len(bins))
-        )
+        cell_html = []
+        for b in range(len(bins)):
+            st = grid[s].get(b)
+            ig = integ_grid.get(s, {}).get(b)
+            cls = "cell" + (" spoof" if ig == "spoof"
+                            else " mismatch" if ig == "mismatch" else "")
+            ig_txt = (" | SPOOFING" if ig == "spoof"
+                      else " | IDENTITY MISMATCH" if ig == "mismatch" else "")
+            cell_html.append(
+                f'<div class="{cls}" style="background:{cell(st)}" '
+                f'title="{html.escape(s)} | {bins[b]:.1f}s | '
+                f'{STATE_LABEL.get(st or "", "no data")}{ig_txt}"></div>'
+            )
+        cells = "".join(cell_html)
         label_score = stats.get(s, {}).get("final_score", 0)
         rows_html.append(
             f'<div class="hm-row"><div class="hm-label">{html.escape(s)}'
@@ -377,6 +444,49 @@ def render_html(students, bins, grid, score_grid, stats,
         </div>""")
     cards_html = "\n".join(cards)
 
+    # ---- identity & liveness integrity ----
+    any_integrity = any(st.get("has_integrity_data") for st in stats.values())
+    if not any_integrity:
+        integrity_html = (
+            '<div class="note" style="background:rgba(148,163,184,.08);'
+            'border-color:rgba(148,163,184,.25);color:#cbd5e1">'
+            'Identity &amp; liveness were not recorded in this session '
+            '(for example, multi-student video mode does not run per-student '
+            'verification).</div>'
+        )
+    else:
+        flagged = [s for s in students
+                   if stats[s].get("identity_verdict") in {"MISMATCH", "UNVERIFIED", "MIXED"}
+                   or stats[s].get("n_spoof", 0) > 0]
+        if flagged:
+            banner = ('<div class="note" style="background:rgba(239,68,68,.10);'
+                      'border-color:rgba(239,68,68,.35);color:#fecaca">'
+                      f'<b>&#9888; Integrity alerts:</b> {len(flagged)} participant(s) '
+                      'flagged. Review the rows below &mdash; these are independent of '
+                      'the attention score.</div>')
+        else:
+            banner = ('<div class="note"><b>&#10003; No integrity issues:</b> all '
+                      'participants verified and no spoofing detected during the '
+                      'session.</div>')
+        ig_rows = []
+        for s in students:
+            st = stats[s]
+            if not st.get("has_integrity_data"):
+                continue
+            verdict = st.get("identity_verdict") or "&mdash;"
+            v_color = "#86efac" if verdict == "VERIFIED" else "#fca5a5"
+            spoof_txt = (f'{st["spoof_seconds"]:.1f}s ({st["n_spoof"]} frames)'
+                         if st["n_spoof"] else "none")
+            spoof_color = "#fca5a5" if st["n_spoof"] else "#94a3b8"
+            ig_rows.append(
+                '<div class="integ-row">'
+                f'<span class="integ-name">{html.escape(s)}</span>'
+                f'<span>Identity: <b style="color:{v_color}">{verdict}</b></span>'
+                f'<span>Spoofing: <b style="color:{spoof_color}">{spoof_txt}</b></span>'
+                '</div>'
+            )
+        integrity_html = banner + '<div class="integ-list">' + "".join(ig_rows) + '</div>'
+
     png_block = ""
     if png_ok:
         png_block = (
@@ -398,6 +508,7 @@ def render_html(students, bins, grid, score_grid, stats,
         timeline=timeline_html,
         png_block=png_block,
         cards=cards_html,
+        integrity=integrity_html,
         n_cols=len(bins),
     )
     return _write(out_path, html_text)
@@ -457,6 +568,15 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
                grid-template-columns:repeat({n_cols},1fr); }}
   .cell {{ height:22px; border-radius:2px; transition:transform .1s; }}
   .cell:hover {{ transform:scaleY(1.25); outline:1px solid #fff; }}
+  .cell.spoof {{ outline:2px solid #ffffff; outline-offset:-2px;
+                 box-shadow:0 0 0 1px #ffffff inset; }}
+  .cell.mismatch {{ outline:2px solid #fde047; outline-offset:-2px; }}
+  .integ-list {{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }}
+  .integ-row {{ display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+                background:var(--panel); border:1px solid var(--line);
+                border-radius:10px; padding:9px 14px; font-size:13px;
+                color:var(--mut); }}
+  .integ-name {{ min-width:120px; color:var(--ink); font-weight:700; }}
   .png-wrap {{ margin-top:16px; }}
   .png-wrap img {{ width:100%; border-radius:14px; border:1px solid var(--line); }}
   .timeline-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
@@ -528,11 +648,19 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 
   <section>
     <h2>Class attention heatmap over time</h2>
-    <div class="legend">{legend}</div>
+    <div class="legend">{legend}
+      <span class="lg"><i style="background:transparent;border:2px solid #fff"></i>Spoofing</span>
+      <span class="lg"><i style="background:transparent;border:2px solid #fde047"></i>Identity mismatch</span>
+    </div>
     <div class="hm">
       {heatmap}
     </div>
     {png_block}
+  </section>
+
+  <section>
+    <h2>Identity &amp; liveness integrity</h2>
+    {integrity}
   </section>
 
   <section>
@@ -580,14 +708,14 @@ def generate(details_csv, out_dir=None):
         print("[ERROR] Could not read data from", details_csv)
         return
 
-    students, bins, grid, score_grid = build_timeline(rows, n_bins=60)
+    students, bins, grid, score_grid, integ_grid = build_timeline(rows, n_bins=60)
     stats = per_student_stats(rows)
 
     png_path = out_dir / "class_attention_heatmap.png"
-    png_ok = render_heatmap_png(students, bins, grid, png_path)
+    png_ok = render_heatmap_png(students, bins, grid, integ_grid, png_path)
 
     html_path = out_dir / "session_report.html"
-    render_html(students, bins, grid, score_grid, stats,
+    render_html(students, bins, grid, score_grid, integ_grid, stats,
                 details_csv.name, png_ok, html_path)
 
     print("=" * 56)

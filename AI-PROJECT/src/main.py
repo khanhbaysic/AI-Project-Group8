@@ -339,6 +339,8 @@ def run():
             "attention_score": record["attention_score"],
             "phone_detected": state == PHONE_USAGE,
             "patterns": "; ".join(active_patterns),
+            "identity_status": identity_status,
+            "liveness_status": liveness_status,
         })
 
         if now - last_pattern_eval >= CONFIG["pattern_interval"]:
@@ -389,6 +391,7 @@ def run():
         fieldnames = [
             "timestamp", "student", "state", "ear", "mar", "yaw", "pitch",
             "roll", "attention_score", "phone_detected", "patterns",
+            "identity_status", "liveness_status",
         ]
         with open(detail_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
