@@ -11,6 +11,7 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+*.json
 
 # --- ML model weights (downloaded on first run, don't commit) ---
 *.pt
@@ -24,6 +25,8 @@ Thumbs.db
 *.mkv
 
 # --- Generated outputs (regenerated every run) ---
+videos/
+**/videos/
 evidence/
 **/evidence/
 analysis_statistics/
