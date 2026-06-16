@@ -18,15 +18,16 @@ SLEEPING    = "SLEEPING"     # eyes closed too long
 ABSENT      = "ABSENT"       # no face / body detected
 PHONE_USAGE = "PHONE_USAGE"  # phone detected near student
 BODY_ONLY   = "BODY_ONLY"    # body visible but face unclear
+SPOOFING    = "SPOOFING"     # anti-spoofing: photo/screen presented
 
 # ---------------------------------------------------------------------------
 # Ordered list (used for confusion-matrix axes and heatmap legends)
 # ---------------------------------------------------------------------------
 
-ALL_STATES = [OK, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT, BODY_ONLY]
+ALL_STATES = [OK, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT, BODY_ONLY, SPOOFING]
 
 # Same order expected by evaluate.py
-EVAL_STATES = [OK, DISTRACTED, TALKING, SLEEPING, ABSENT, PHONE_USAGE, BODY_ONLY]
+EVAL_STATES = [OK, DISTRACTED, TALKING, SLEEPING, ABSENT, PHONE_USAGE, BODY_ONLY, SPOOFING]
 
 # Human-readable labels (English)
 LABEL_EN = {
@@ -37,6 +38,7 @@ LABEL_EN = {
     PHONE_USAGE: "Phone Usage",
     SLEEPING:    "Sleeping",
     ABSENT:      "Absent",
+    SPOOFING:    "Spoofing",
 }
 
 # Shared visual palette. Values are CSS hex colors; OpenCV callers can convert
@@ -49,4 +51,5 @@ STATE_COLORS = {
     PHONE_USAGE: "#ef4444",
     SLEEPING:    "#3b82f6",
     ABSENT:      "#1e293b",
+    SPOOFING:    "#dc2626",
 }

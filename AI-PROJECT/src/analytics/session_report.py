@@ -30,7 +30,7 @@ from pathlib import Path
 
 from src.config import CONFIG
 from src.states import (
-    OK, BODY_ONLY, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT,
+    OK, BODY_ONLY, DISTRACTED, TALKING, PHONE_USAGE, SLEEPING, ABSENT, SPOOFING,
     ALL_STATES, LABEL_EN, STATE_COLORS,
 )
 

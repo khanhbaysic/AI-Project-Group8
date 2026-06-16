@@ -6,7 +6,7 @@ from src.behavior_analyzer.temporal_buffer import TemporalBuffer
 from src.eye_monitor import EyeMonitor
 from src.liveness_detector import LivenessDetector
 from src.mouth_monitor import MouthMonitor
-from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
+from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, SPOOFING, TALKING
 
 
 class StudentState:
@@ -55,6 +55,11 @@ class StudentState:
         # carry the latest liveness verdict into every record (refreshed by
         # check_liveness when a face is present; carried over otherwise)
         record["liveness_status"] = self.last_liveness_status
+        # When anti-spoofing fires, override the behavioral state so that
+        # the `state` column in the details CSV reflects SPOOFING — this
+        # makes it visible to the evaluation harness and the heatmap.
+        if self.last_liveness_status == SPOOFING:
+            record["state"] = SPOOFING
         state = record["state"]
         _, display_score = self.attention.update(state, dt)
         record["attention_score"] = display_score

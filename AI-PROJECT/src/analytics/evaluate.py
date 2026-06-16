@@ -64,6 +64,7 @@ def read_details(path):
                 "t": float(r.get("timestamp", 0) or 0),
                 "student": r.get("student", "?"),
                 "state": (r.get("state") or "").strip(),
+                "liveness_status": (r.get("liveness_status") or "").strip(),
             })
     return rows
 
@@ -129,7 +130,14 @@ def collect_pairs_segment(labels_csv, details_csv):
         if yt is None:
             unmatched += 1
             continue
-        pairs.append((yt, d["state"]))
+        # For SPOOFING ground-truth segments, prefer liveness_status as the
+        # predicted label (fallback for old CSVs where state col stayed "OK").
+        # New CSVs produced after the pipeline fix already set state=SPOOFING.
+        if yt == "SPOOFING" and d["state"] != "SPOOFING":
+            yp = d["liveness_status"] if d["liveness_status"] else d["state"]
+        else:
+            yp = d["state"]
+        pairs.append((yt, yp))
     return pairs, unmatched
 
 
