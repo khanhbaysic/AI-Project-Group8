@@ -26,6 +26,7 @@ def color_for_state(state):
         "ABSENT": (80, 80, 80),
         "PHONE_USAGE": (255, 0, 255),
         "BODY_ONLY": (180, 180, 180),
+        "SPOOFING": (38, 38, 220),   # #dc2626 in BGR – bright red
     }.get(state, (220, 220, 220))
 
 
@@ -442,12 +443,14 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                 detail_rows.append(record.copy())
 
                 x, y, w, h = bbox
-                color = color_for_state(state)
+                # Use the post-update state (may have been overridden to SPOOFING)
+                display_state = record["state"]
+                color = color_for_state(display_state)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                 if face_bbox is not None:
                     fx, fy, fw, fh = face_bbox
                     cv2.rectangle(frame, (fx, fy), (fx + fw, fy + fh), color, 1)
-                cv2.putText(frame, f"{label} {state} {score:.1f}", (x, max(20, y - 8)),
+                cv2.putText(frame, f"{label} {display_state} {score:.1f}", (x, max(20, y - 8)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
             if use_yolo_track_ids:
@@ -564,9 +567,11 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                 detail_rows.append(record.copy())
 
                 x, y, w, h = bbox
-                color = color_for_state(state)
+                # Use the post-update state (may have been overridden to SPOOFING)
+                display_state = record["state"]
+                color = color_for_state(display_state)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-                cv2.putText(frame, f"{label} {state} {score:.1f}", (x, max(20, y - 8)),
+                cv2.putText(frame, f"{label} {display_state} {score:.1f}", (x, max(20, y - 8)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         if active_phone_centers:

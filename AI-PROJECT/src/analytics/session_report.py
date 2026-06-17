@@ -115,18 +115,23 @@ def build_timeline(rows, n_bins=60):
     for s in students:
         for b in range(n_bins):
             sts = states_in.get((s, b))
-            if sts:
-                # most frequent state in this bin
-                grid[s][b] = max(set(sts), key=sts.count)
-                sc = scores_in[(s, b)]
-                score_grid[s][b] = sum(sc) / len(sc)
-            else:
-                grid[s][b] = None          # no data
-                score_grid[s][b] = None
             # integrity flag for this bin (spoofing takes priority over mismatch)
             ig = integ_in.get((s, b))
             integ_grid[s][b] = ("spoof" if ig and "spoof" in ig
                                 else "mismatch" if ig else None)
+            if sts:
+                sc = scores_in[(s, b)]
+                score_grid[s][b] = sum(sc) / len(sc)
+                # If any liveness-spoofing event occurred in this bin, force the
+                # cell color to SPOOFING so the heatmap stays red — not green —
+                # even when behavioural-state rows outnumber spoofing rows.
+                if integ_grid[s][b] == "spoof":
+                    grid[s][b] = SPOOFING
+                else:
+                    grid[s][b] = max(set(sts), key=sts.count)
+            else:
+                grid[s][b] = None          # no data
+                score_grid[s][b] = None
 
     bins = [t_min + (i + 0.5) * width for i in range(n_bins)]
     return students, bins, grid, score_grid, integ_grid
@@ -303,9 +308,10 @@ def render_heatmap_png(students, bins, grid, integ_grid, out_path):
 
     legend = [Patch(facecolor=STATE_COLORS[s], label=STATE_LABEL[s])
               for s in STATE_ORDER]
-    if spoof_pts:
-        legend.append(Line2D([0], [0], marker="x", color="#ffffff", linestyle="None",
-                             markersize=8, markeredgewidth=1.6, label="Spoofing"))
+    # Note: SPOOFING state is already shown as a colored patch above.
+    # The X marker is an *additional* liveness-alert overlay on top of the
+    # cell background.  We do NOT add a second "Spoofing" entry here to
+    # avoid the duplicate label in the legend.
     if mismatch_pts:
         legend.append(Line2D([0], [0], marker="s", markerfacecolor="none",
                              markeredgecolor="#fde047", color="#fde047",
