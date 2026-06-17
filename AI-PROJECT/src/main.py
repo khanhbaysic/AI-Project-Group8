@@ -85,6 +85,8 @@ def run():
         CONFIG["liveness_window_seconds"],
         CONFIG["ear_threshold"],
         CONFIG.get("liveness_spoof_confirm_seconds", 4.0),
+        CONFIG.get("liveness_require_blink", True),
+        CONFIG.get("liveness_max_score_without_blink", 0.29),
     )
     identity_verifier = IdentityVerifier(
          CONFIG["identity_detector_model"],
@@ -265,12 +267,18 @@ def run():
             ear, sleeping = eye_monitor.check(landmarks, now)
             mar, talking = mouth_monitor.check(landmarks, now)
             liveness_score, liveness_status = liveness_detector.update(now, landmarks, ear, yaw, pitch)
-            # Only override SPOOFING→LIVE when the student is genuinely
-            # sleeping (sustained eye closure), not on brief blinks.
-            # A blink is the PRIMARY proof of liveness in the new detector;
-            # cancelling on any momentary EAR dip would break detection.
-            if sleeping and liveness_status == "SPOOFING":
-                liveness_status = "LIVE"
+            # Closed eyes / drowsiness are expected to be still. Do not let
+            # the anti-spoofing heuristic compete with sleeping detection.
+            closed_eye_gate = max(
+                eye_monitor.ear_threshold,
+                CONFIG.get("liveness_closed_eye_ear_threshold", 0.16),
+            )
+            if (
+                ear < closed_eye_gate
+                or getattr(eye_monitor, "last_sleep_ear", ear) < closed_eye_gate
+                or sleeping
+            ) and liveness_status == "SPOOFING":
+                liveness_status = "CHECKING"
 
             if identity_load_status != "READY":
                 identity_status = identity_load_status

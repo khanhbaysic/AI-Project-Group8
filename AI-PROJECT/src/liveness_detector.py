@@ -57,12 +57,16 @@ class LivenessDetector:
         window_seconds: float = 8.0,
         ear_threshold: float = 0.22,
         spoof_confirm_seconds: float = 3.0,
+        require_blink: bool = True,
+        max_score_without_blink: float = 0.29,
     ):
         self.threshold = threshold
         self.warmup_seconds = warmup_seconds
         self.window_seconds = window_seconds
         self.ear_threshold = ear_threshold
         self.spoof_confirm_seconds = spoof_confirm_seconds
+        self.require_blink = require_blink
+        self.max_score_without_blink = max_score_without_blink
 
         self.samples: deque = deque()
         self.started_at: float | None = None
@@ -190,6 +194,8 @@ class LivenessDetector:
             + 0.20 * ear_var_score
             + 0.15 * head_sway_score
         )
+        if self.require_blink and self._blink_count == 0:
+            score = min(score, self.max_score_without_blink)
 
         if elapsed < self.warmup_seconds:
             return max(0.5, score), "CHECKING"

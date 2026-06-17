@@ -88,6 +88,8 @@ CONFIG = {
     "liveness_warmup_seconds": 5.0,
     "liveness_window_seconds": 8.0,
     "liveness_spoof_confirm_seconds": 3.0,
+    "liveness_require_blink": True,
+    "liveness_max_score_without_blink": 0.29,
 
     "identity_similarity_threshold": 0.363,
     "identity_check_interval": 0.5,
