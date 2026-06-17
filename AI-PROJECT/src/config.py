@@ -24,25 +24,25 @@ CONFIG = {
     "video_distraction_fall_rate": 0.8,
     "video_ear_threshold": 0.18,
     "video_sleep_duration": 1.5,
-    "video_mar_threshold": 0.46,
-    "video_talk_duration": 0.35,
-    "video_talk_window": 1.2,
-    "video_talk_min_transitions": 1,
-    "video_talk_mar_variance_threshold": 0.0012,
+    "video_mar_threshold": 0.50,
+    "video_talk_duration": 0.6,
+    "video_talk_window": 1.4,
+    "video_talk_min_transitions": 2,
+    "video_talk_mar_variance_threshold": 0.0025,
     "video_progressive_drowsiness_ear_threshold": 0.035,
     "video_use_pitch_distraction": True,
     "video_absent_duration": 1.5,       # seconds missed before a track is declared ABSENT
     "video_absent_track_keep_seconds": 8.0, # keep missing tracks long enough to log true absence
     "phone_detection_enabled": True,
     "phone_model_path": "yolov8n.pt",
-    "phone_confidence": 0.20,
-    "phone_min_aspect_ratio": 1.0,
-    "phone_max_aspect_ratio": 6.0,
+    "phone_confidence": 0.35,
+    "phone_min_aspect_ratio": 1.4,
+    "phone_max_aspect_ratio": 4.8,
     "person_confidence": 0.45,
     "phone_interval_frames": 2,
     "phone_near_student_scale": 1.8,
-    "video_phone_duration": 0.3,
-    "phone_seen_window": 1.0,
+    "video_phone_duration": 0.8,
+    "phone_seen_window": 0.4,
     "person_tracking_enabled": True,
     "person_tracker_backend": "centroid",
     "person_min_box_area_ratio": 0.004,
@@ -60,11 +60,11 @@ CONFIG = {
     "sleep_duration": 2.0,
     "sleep_use_min_eye_ear": True,
     "sleep_min_eye_threshold_factor": 0.9,
-    "mar_threshold": 0.48,              # lower = more sensitive mouth-open transition detection
-    "talk_duration": 0.5,                # lower = talking is confirmed sooner
+    "mar_threshold": 0.50,              # lower = more sensitive mouth-open transition detection
+    "talk_duration": 0.7,                # lower = talking is confirmed sooner
     "talk_window": 1.5,                  # rolling window (seconds) for oscillation analysis
     "talk_min_transitions": 2,           # lower = fewer open/close cycles needed for speech
-    "talk_mar_variance_threshold": 0.0015, # lower = subtler mouth motion can trigger speech
+    "talk_mar_variance_threshold": 0.0025, # lower = subtler mouth motion can trigger speech
     "absent_duration": 3.0,
 
     "attention_alpha": 0.15,
