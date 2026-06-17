@@ -90,6 +90,7 @@ CONFIG = {
     "liveness_spoof_confirm_seconds": 3.0,
     "liveness_require_blink": True,
     "liveness_max_score_without_blink": 0.29,
+    "liveness_no_blink_grace_seconds": 15.0,
 
     "identity_similarity_threshold": 0.363,
     "identity_check_interval": 0.5,

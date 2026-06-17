@@ -87,6 +87,7 @@ def run():
         CONFIG.get("liveness_spoof_confirm_seconds", 4.0),
         CONFIG.get("liveness_require_blink", True),
         CONFIG.get("liveness_max_score_without_blink", 0.29),
+        CONFIG.get("liveness_no_blink_grace_seconds", 15.0),
     )
     identity_verifier = IdentityVerifier(
          CONFIG["identity_detector_model"],
@@ -115,8 +116,8 @@ def run():
     if phone_detector.warning:
         print(f"[WARN] {phone_detector.warning}")
 
-    identity_load_status = "NOT_LOADED"
-    identity_load_message = ""
+    identity_load_status = "SKIPPED"
+    identity_load_message = "Identity reference check disabled"
     if not student_id:
         identity_load_status = "UNKNOWN_ID"
         identity_load_message = "Empty student ID"
@@ -124,9 +125,8 @@ def run():
         identity_load_status = "UNKNOWN_ID"
         identity_load_message = f"Unknown student ID: {student_id}"
     else:
-        ok, message = identity_verifier.load_reference(student.reference_image)
-        identity_load_status = "READY" if ok else "NO_REFERENCE"
-        identity_load_message = message
+        identity_load_status = "SKIPPED"
+        identity_load_message = "Reference image not required"
 
     print(f"[INFO] Student ID: {student_id or '(empty)'}")
     print(f"[INFO] Identity database status: {identity_load_status} - {identity_load_message}")

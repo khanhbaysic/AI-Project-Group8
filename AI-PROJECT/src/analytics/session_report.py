@@ -93,7 +93,7 @@ def build_timeline(rows, n_bins=60):
     states_in = defaultdict(list)   # (s, b) -> [state,...]
     scores_in = defaultdict(list)   # (s, b) -> [score,...]
     integ_in = defaultdict(list)    # (s, b) -> ["spoof"/"mismatch",...]
-    bad_identity = {"MISMATCH", "UNKNOWN_ID", "NO_REFERENCE", "BLOCKED"}
+    bad_identity = {"MISMATCH", "UNKNOWN_ID", "BLOCKED"}
     # Identity verification only applies to students who were actually enrolled
     # (an ID was entered and their face matched the reference at least once).
     # Multi-student video mode has no enrollment, so an identity "mismatch"
@@ -200,7 +200,7 @@ def per_student_stats(rows):
 
         # identity / liveness integrity (orthogonal to behavioural state)
         n = len(items)
-        bad_identity = {"MISMATCH", "UNKNOWN_ID", "NO_REFERENCE", "BLOCKED"}
+        bad_identity = {"MISMATCH", "UNKNOWN_ID", "BLOCKED"}
         id_values = [x["identity"] for x in items if x.get("identity")]
         # identity only applies if this student was enrolled & verified >=1 time
         # (video mode has no enrollment -> identity is "not applicable", never a mismatch)
@@ -213,7 +213,7 @@ def per_student_stats(rows):
             identity_verdict = ""                      # not applicable (e.g. video mode)
         elif any(x.get("identity") == "MISMATCH" for x in items):
             identity_verdict = "MISMATCH"
-        elif any(x.get("identity") in {"UNKNOWN_ID", "NO_REFERENCE"} for x in items):
+        elif any(x.get("identity") == "UNKNOWN_ID" for x in items):
             identity_verdict = "UNVERIFIED"
         elif id_values and all(v == "VERIFIED" for v in id_values):
             identity_verdict = "VERIFIED"

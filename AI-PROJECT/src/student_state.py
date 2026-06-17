@@ -33,6 +33,9 @@ class StudentState:
             config["liveness_window_seconds"],
             config["ear_threshold"],
             config.get("liveness_spoof_confirm_seconds", 4.0),
+            config.get("liveness_require_blink", True),
+            config.get("liveness_max_score_without_blink", 0.29),
+            config.get("liveness_no_blink_grace_seconds", 15.0),
         )
         self.last_liveness_status = "NO_FACE"
         self.last_liveness_score = 0.0

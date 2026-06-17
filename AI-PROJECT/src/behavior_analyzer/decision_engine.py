@@ -12,9 +12,6 @@ class DecisionEngine:
         if record.get("identity_status") == "UNKNOWN_ID":
             alerts.append("Unknown Student ID")
             level = "CRITICAL"
-        if record.get("identity_status") == "NO_REFERENCE":
-            alerts.append("Missing Reference Image")
-            level = "CRITICAL"
         if record.get("liveness_status") == "SPOOFING":
             alerts.append("Spoofing Detected")
             level = "CRITICAL"

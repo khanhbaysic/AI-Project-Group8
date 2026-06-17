@@ -72,7 +72,9 @@ student_id,name,reference_image
 202417140,Student Name,reference_images/202417140.jpg
 ```
 
-Reference image paths are relative to `database/`.
+The `reference_image` column is optional in the current demo flow. Webcam and
+video analysis do not require a reference face image; identity verification is
+skipped when no reference is used.
 
 ## Run Webcam Mode
 

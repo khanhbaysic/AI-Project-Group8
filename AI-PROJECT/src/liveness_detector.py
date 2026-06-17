@@ -59,6 +59,7 @@ class LivenessDetector:
         spoof_confirm_seconds: float = 3.0,
         require_blink: bool = True,
         max_score_without_blink: float = 0.29,
+        no_blink_grace_seconds: float = 15.0,
     ):
         self.threshold = threshold
         self.warmup_seconds = warmup_seconds
@@ -67,6 +68,7 @@ class LivenessDetector:
         self.spoof_confirm_seconds = spoof_confirm_seconds
         self.require_blink = require_blink
         self.max_score_without_blink = max_score_without_blink
+        self.no_blink_grace_seconds = no_blink_grace_seconds
 
         self.samples: deque = deque()
         self.started_at: float | None = None
@@ -199,6 +201,10 @@ class LivenessDetector:
 
         if elapsed < self.warmup_seconds:
             return max(0.5, score), "CHECKING"
+
+        if self.require_blink and self._blink_count == 0 and elapsed < self.no_blink_grace_seconds:
+            self._spoofing_since = None
+            return round(float(score), 3), "CHECKING"
 
         if score >= self.threshold:
             self._spoofing_since = None
