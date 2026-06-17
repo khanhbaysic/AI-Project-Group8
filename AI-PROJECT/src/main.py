@@ -12,7 +12,7 @@ from src.behavior_analyzer.decision_engine import DecisionEngine
 from src.behavior_analyzer.pattern_detector import PatternDetector
 from src.behavior_analyzer.temporal_buffer import TemporalBuffer
 from src.config import CONFIG, PROJECT_ROOT
-from src.dashboard import Dashboard
+from src.dashboard import Dashboard, STATE_COLORS_BGR
 from src.database import StudentDatabase
 from src.eye_monitor import EyeMonitor
 from src.face_detector import FaceDetector
@@ -22,7 +22,7 @@ from src.liveness_detector import LivenessDetector
 from src.mouth_monitor import MouthMonitor
 from src.phone_detector import PhoneDetector, expanded_intersection
 from src.state_classifier import StateClassifier
-from src.states import ABSENT, BODY_ONLY, OK, PHONE_USAGE
+from src.states import ABSENT, BODY_ONLY, OK, PHONE_USAGE, SPOOFING
 
 
 def build_default_record(student_id, state=ABSENT):
@@ -125,8 +125,14 @@ def run():
         identity_load_status = "UNKNOWN_ID"
         identity_load_message = f"Unknown student ID: {student_id}"
     else:
-        identity_load_status = "SKIPPED"
-        identity_load_message = "Reference image not required"
+        # Student found in DB — try to load their reference image into the verifier.
+        ok, msg = identity_verifier.load_reference(student.reference_image)
+        if ok:
+            identity_load_status = "READY"
+            identity_load_message = f"Reference loaded for {student.name} ({student.reference_image})"
+        else:
+            identity_load_status = "ERROR"
+            identity_load_message = msg
 
     print(f"[INFO] Student ID: {student_id or '(empty)'}")
     print(f"[INFO] Identity database status: {identity_load_status} - {identity_load_message}")
@@ -303,6 +309,16 @@ def run():
             if phone_last_seen is not None and (now - phone_last_seen) <= _phone_window:
                 state = PHONE_USAGE
 
+            # --- Anti-spoofing override (HIGHEST PRIORITY) ---
+            # If liveness detection has confirmed spoofing, force the state to
+            # SPOOFING regardless of what the behavioural classifier decided.
+            # This ensures:
+            #   1. The attention score decreases at the SPOOFING rate (-8/s).
+            #   2. The dashboard CURRENT STATE box shows "SPOOFING" (not "OK").
+            #   3. The CSV row records state=SPOOFING for post-session analytics.
+            if liveness_status == "SPOOFING":
+                state = "SPOOFING"
+
             record.update({
                 "ear": ear,
                 "mar": mar,
@@ -316,7 +332,7 @@ def run():
             })
 
             for x, y, w, h in detection.faces:
-                color = (0, 220, 80) if state == OK else (0, 0, 255)
+                color = STATE_COLORS_BGR.get(state, (0, 0, 255))
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 
         for phone in phone_detections:
