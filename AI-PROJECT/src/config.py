@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, TALKING
+from src.states import ABSENT, BODY_ONLY, DISTRACTED, OK, PHONE_USAGE, SLEEPING, SPOOFING, TALKING
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +73,7 @@ CONFIG = {
         ABSENT: -6.0,
         PHONE_USAGE: -4.0,
         BODY_ONLY: -6.0,
+        SPOOFING: -8.0,
     },
 
     "buffer_seconds": 60.0,
@@ -83,10 +84,10 @@ CONFIG = {
     "rapid_attention_drop_window": 20.0,
     "rapid_attention_drop_points": 30.0,
 
-    "liveness_threshold": 0.30,
-    "liveness_warmup_seconds": 8.0,
-    "liveness_window_seconds": 10.0,
-    "liveness_spoof_confirm_seconds": 4.0,
+    "liveness_threshold": 0.50,
+    "liveness_warmup_seconds": 5.0,
+    "liveness_window_seconds": 8.0,
+    "liveness_spoof_confirm_seconds": 3.0,
 
     "identity_similarity_threshold": 0.363,
     "identity_check_interval": 0.5,

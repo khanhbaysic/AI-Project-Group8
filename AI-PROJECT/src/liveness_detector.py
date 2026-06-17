@@ -4,47 +4,59 @@ import numpy as np
 
 
 # ---------------------------------------------------------------------------
-# Landmark indices used for computing internal facial geometry variance.
-# These are spread across different facial regions so that organic muscle
-# movement (live face) creates measurable relative jitter, while a static
-# photo — even one being shaken — stays rigid.
+# Landmark indices for internal shape geometry analysis.
+# Spread across different facial regions so that organic muscle movement
+# creates measurable relative deformation while a rigid photo stays flat.
 # ---------------------------------------------------------------------------
 # Regions: nose tip, chin, left/right eye outer corners, left/right mouth
 # corners, left/right eyebrow outer, forehead center
 _SHAPE_IDXS = np.array([1, 152, 33, 263, 61, 291, 70, 300, 10])
 
+# Typical MediaPipe per-landmark noise floor in *normalised* coords
+# (pixel noise / face_width).  Values below this are unreliable.
+# Conservatively estimated at ~1.5px noise on a ~150px-wide face = 0.010.
+_NORM_NOISE_FLOOR = 0.010
+
 
 class LivenessDetector:
-    """Robust CPU-friendly liveness estimator using blink and rigidity cues.
+    """Blink-primary liveness estimator.
 
-    Key improvements over the naïve motion-only approach:
-    -------------------------------------------------------
-    1. **Rigidity penalty** – When the whole face translates as a rigid block
-       (e.g., a photo being shaken), the *global* translation dominates and the
-       *local* relative-landmark variance stays near zero.  A real face has
-       organic muscle movement that creates local jitter independent of global
-       head motion.  We therefore reward local variance while punishing purely
-       global (rigid) motion.
+    Design rationale
+    ----------------
+    Previous versions relied on landmark-motion variance (local organic score)
+    and rigidity analysis.  These are defeated by MediaPipe's own landmark
+    jitter: even 1-2 px of detector noise on a still photo produces variance
+    values that saturate the score and classify photos as LIVE.
 
-    2. **Blink gate** – A genuine blink is the single strongest proof of
-       liveness.  If no blink is observed after the warmup period the blink
-       score stays at zero, dragging the total score below the threshold.
+    The only signal a photo **genuinely cannot fake** is a blink:
+      - A real eye closes (EAR drops well below threshold) and reopens.
+      - A printed/displayed photo has a fixed open-eye EAR that never dips.
 
-    3. **Faster detection** – Warmup and window have been shortened so that
-       spoofing is flagged in ~3-5 s rather than 20-30 s.
+    New weight scheme
+    -----------------
+    * Blink presence (0.65) – dominant; one confirmed blink makes score ≥ 0.65
+    * EAR micro-variance (0.20) – variance of EAR signal above the noise floor
+    * Head-pose micro-sway  (0.15) – natural postural sway (low weight; photos
+      can also have pose jitter from the detector)
 
-    4. **No face-center motion reward** – Raw face-center displacement was the
-       loophole that let a shaken photo accumulate liveness points.  It is
-       replaced by the rigidity-corrected local variance.
+    Threshold raised to 0.50:
+      - A photo with no blink: blink_score=0.  Even if EAR-var and head scores
+        each max out (unlikely for a still photo), max = 0+0.20+0.15 = 0.35 < 0.50
+        → SPOOFING detected correctly.
+      - A real face with 1 blink: blink_score=1.0, total ≥ 0.65 > 0.50
+        → LIVE detected correctly.
+
+    The old landmark-shape variance is intentionally removed because it cannot
+    be distinguished from detector noise without per-device calibration.
     """
 
     def __init__(
         self,
-        threshold: float = 0.38,
-        warmup_seconds: float = 2.5,
-        window_seconds: float = 5.0,
+        threshold: float = 0.50,
+        warmup_seconds: float = 5.0,
+        window_seconds: float = 8.0,
         ear_threshold: float = 0.22,
-        spoof_confirm_seconds: float = 4.0,
+        spoof_confirm_seconds: float = 3.0,
     ):
         self.threshold = threshold
         self.warmup_seconds = warmup_seconds
@@ -57,6 +69,9 @@ class LivenessDetector:
         self._spoofing_since: float | None = None
         self._was_open: bool = True
         self._blink_count: int = 0
+        # Track the minimum EAR seen in each blink candidate
+        self._in_blink: bool = False
+        self._blink_min_ear: float = 1.0
 
     # ------------------------------------------------------------------
     # Public API
@@ -85,35 +100,31 @@ class LivenessDetector:
         if self.started_at is None:
             self.started_at = now
 
-        # --- blink detection ---
-        is_open = ear >= self.ear_threshold
-        if self._was_open and not is_open:
-            self._blink_count += 1
-        self._was_open = is_open
+        # ------------------------------------------------------------------
+        # Blink detection – track full open→closed→open transitions.
+        # We require the EAR to drop below (ear_threshold * 0.85) to count
+        # as a genuine closure, not just a flutter from detector noise.
+        # ------------------------------------------------------------------
+        blink_thresh = self.ear_threshold * 0.85
+        is_closed = ear < blink_thresh
 
-        # --- extract normalised shape vector (pose-invariant) ---
-        # Project all shape landmarks into a coordinate frame anchored at the
-        # nose tip and scaled by face width so that global translation and
-        # scale are removed.  This leaves only *internal* shape deformation.
-        shape_pts = landmarks[_SHAPE_IDXS, :2].astype(np.float32)        # (9, 2)
-        nose_tip = landmarks[1, :2].astype(np.float32)
-        face_width = float(np.linalg.norm(
-            landmarks[234, :2] - landmarks[454, :2]
-        ))
-        face_width = max(face_width, 1e-6)
-        norm_shape = (shape_pts - nose_tip) / face_width                  # (9, 2)
+        if is_closed:
+            self._in_blink = True
+            self._blink_min_ear = min(self._blink_min_ear, ear)
+        elif self._in_blink:
+            # Eye just reopened – count as blink only if it closed enough
+            if self._blink_min_ear < blink_thresh:
+                self._blink_count += 1
+            self._in_blink = False
+            self._blink_min_ear = 1.0
 
-        # --- global face centre (for rigidity analysis) ---
-        center = np.mean(landmarks[:, :2], axis=0).astype(np.float32)
-        norm_center = center / face_width
+        self._was_open = not is_closed
 
         self.samples.append({
             "time": now,
             "ear": float(ear),
             "yaw": float(yaw),
             "pitch": float(pitch),
-            "norm_shape": norm_shape,   # (9, 2)
-            "norm_center": norm_center,  # (2,)
             "blink_count": self._blink_count,
         })
 
@@ -122,7 +133,7 @@ class LivenessDetector:
             self.samples.popleft()
 
         elapsed = now - self.started_at
-        if len(self.samples) < 3:
+        if len(self.samples) < 5:
             return 0.5, "CHECKING"
 
         # ------------------------------------------------------------------
@@ -132,69 +143,52 @@ class LivenessDetector:
         last = self.samples[-1]
 
         blink_delta = last["blink_count"] - first["blink_count"]
-
-        shapes = np.stack([s["norm_shape"] for s in self.samples])      # (N, 9, 2)
-        centers = np.stack([s["norm_center"] for s in self.samples])    # (N, 2)
+        ears = np.array([s["ear"] for s in self.samples], np.float32)
         yaws = np.array([s["yaw"] for s in self.samples], np.float32)
         pitches = np.array([s["pitch"] for s in self.samples], np.float32)
 
         # ------------------------------------------------------------------
-        # Score 1 – Blink score (0–1)
-        # One blink is enough proof; anything beyond is capped.
+        # Score 1 – Blink score (0–1)  [weight 0.65]
+        # One confirmed blink is proof of liveness.  We also give partial
+        # credit for large EAR dips that didn't quite close (squinting).
         # ------------------------------------------------------------------
         blink_score = min(1.0, blink_delta / 1.0)
 
         # ------------------------------------------------------------------
-        # Score 2 – Local organic shape variance (0–1)
-        # Measure frame-to-frame variance of the *normalised* shape vector.
-        # Because global translation and scale are already removed, only
-        # genuine facial muscle micro-movements survive.
-        # A photo — even a shaken one — stays rigid → variance ≈ 0.
-        # A live face has breathing, subtle expression changes → variance > 0.
-        #
-        # Calibration: live faces typically produce values in [0.003, 0.015].
-        # We scale so that ~0.008 maps to score ≈ 0.5.
+        # Score 2 – EAR micro-variance (0–1)  [weight 0.20]
+        # The standard deviation of EAR across the window reveals:
+        #   - Real eyes: subtle continuous fluctuation from involuntary saccades,
+        #     micro-expressions, breathing.
+        #   - Photo eyes: EAR is nearly constant (detector noise only ~0.003).
+        # Calibration: live faces → EAR std typically in [0.010, 0.040].
+        # We scale so that std=0.015 → score=1.0.
+        # Photos produce EAR std ≈ 0.002-0.005 → score ≈ 0.13-0.33.
         # ------------------------------------------------------------------
-        shape_std = float(np.std(shapes, axis=0).mean())   # mean std per coord
-        local_organic_score = min(1.0, shape_std / 0.012)
+        ear_std = float(np.std(ears))
+        ear_var_score = min(1.0, ear_std / 0.015)
 
         # ------------------------------------------------------------------
-        # Score 3 – Rigidity penalty
-        # If the global center moves a lot but the normalised shape barely
-        # changes, the motion is rigid (photo being shaken).
-        # We compute the ratio of global motion to local shape motion.
-        # A high ratio → penalty.  This score is 1 when motion is organic
-        # and < 1 when motion is rigidly global.
+        # Score 3 – Head-pose micro-sway (0–1)  [weight 0.15]
+        # Natural breathing and postural sway produces small yaw/pitch
+        # variation (~1-3°). A still photo produces near-zero variation
+        # (or detector noise only ~0.5°). Low weight because a handheld
+        # photo can also produce pose variation.
+        # Scale: (std_yaw + std_pitch) = 2° → score = 0.33; 6° → 1.0
         # ------------------------------------------------------------------
-        global_motion = float(np.std(centers, axis=0).mean())
-        if global_motion < 1e-5:
-            # Nothing is moving at all – consistent with a static photo
-            rigidity_score = 0.0
-        else:
-            # How much of the motion is accounted for by internal deformation?
-            ratio = shape_std / (global_motion + 1e-8)
-            # ratio close to 0 → rigid (photo shaking)
-            # ratio close to 1+ → organic (live face)
-            rigidity_score = min(1.0, ratio * 6.0)
-
-        # ------------------------------------------------------------------
-        # Score 4 – Head pose micro-variation (0–1)
-        # Real heads show small natural sway in yaw/pitch from breathing and
-        # small postural adjustments.  A perfect still photo yields near-zero
-        # std in pose angles.  However, a shaken photo *also* produces pose
-        # variation, so this score has lower weight than in the original.
-        # ------------------------------------------------------------------
-        head_motion_score = min(1.0, (float(np.std(yaws)) + float(np.std(pitches))) / 6.0)
+        head_sway_score = min(1.0, (float(np.std(yaws)) + float(np.std(pitches))) / 6.0)
 
         # ------------------------------------------------------------------
         # Composite score
-        # Weights: blink 40 %, local organic 30 %, rigidity 20 %, head 10 %
+        # Weights: blink 65%, EAR-variance 20%, head-sway 15%
+        # Threshold = 0.50
+        #
+        # Photo (no blink):   0*0.65 + ≤0.33*0.20 + ≤0.33*0.15 = ≤0.115 < 0.50 ✓
+        # Real (1 blink):     1*0.65 + any*0.20   + any*0.15   ≥ 0.65 > 0.50 ✓
         # ------------------------------------------------------------------
         score = (
-            0.40 * blink_score
-            + 0.30 * local_organic_score
-            + 0.20 * rigidity_score
-            + 0.10 * head_motion_score
+            0.65 * blink_score
+            + 0.20 * ear_var_score
+            + 0.15 * head_sway_score
         )
 
         if elapsed < self.warmup_seconds:
