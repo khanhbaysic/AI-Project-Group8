@@ -24,8 +24,11 @@ CONFIG = {
     "video_distraction_fall_rate": 0.8,
     "video_ear_threshold": 0.18,
     "video_sleep_duration": 1.5,
-    "video_mar_threshold": 0.58,
-    "video_talk_duration": 0.8,
+    "video_mar_threshold": 0.46,
+    "video_talk_duration": 0.35,
+    "video_talk_window": 1.2,
+    "video_talk_min_transitions": 1,
+    "video_talk_mar_variance_threshold": 0.0012,
     "video_progressive_drowsiness_ear_threshold": 0.035,
     "video_use_pitch_distraction": True,
     "video_absent_duration": 1.5,       # seconds missed before a track is declared ABSENT
@@ -57,11 +60,11 @@ CONFIG = {
     "sleep_duration": 2.0,
     "sleep_use_min_eye_ear": True,
     "sleep_min_eye_threshold_factor": 0.9,
-    "mar_threshold": 0.52,              # lower = more sensitive mouth-open transition detection
-    "talk_duration": 1.0,                # lower = talking is confirmed sooner
+    "mar_threshold": 0.48,              # lower = more sensitive mouth-open transition detection
+    "talk_duration": 0.5,                # lower = talking is confirmed sooner
     "talk_window": 1.5,                  # rolling window (seconds) for oscillation analysis
     "talk_min_transitions": 2,           # lower = fewer open/close cycles needed for speech
-    "talk_mar_variance_threshold": 0.003, # lower = subtler mouth motion can trigger speech
+    "talk_mar_variance_threshold": 0.0015, # lower = subtler mouth motion can trigger speech
     "absent_duration": 3.0,
 
     "attention_alpha": 0.15,

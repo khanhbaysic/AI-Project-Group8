@@ -198,6 +198,15 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
     video_config["sleep_duration"] = CONFIG.get("video_sleep_duration", CONFIG["sleep_duration"])
     video_config["mar_threshold"] = CONFIG.get("video_mar_threshold", CONFIG["mar_threshold"])
     video_config["talk_duration"] = CONFIG.get("video_talk_duration", CONFIG["talk_duration"])
+    video_config["talk_window"] = CONFIG.get("video_talk_window", CONFIG.get("talk_window", 1.5))
+    video_config["talk_min_transitions"] = CONFIG.get(
+        "video_talk_min_transitions",
+        CONFIG.get("talk_min_transitions", 3),
+    )
+    video_config["talk_mar_variance_threshold"] = CONFIG.get(
+        "video_talk_mar_variance_threshold",
+        CONFIG.get("talk_mar_variance_threshold", 0.005),
+    )
     video_config["progressive_drowsiness_ear_threshold"] = CONFIG.get(
         "video_progressive_drowsiness_ear_threshold",
         video_config["ear_threshold"],
