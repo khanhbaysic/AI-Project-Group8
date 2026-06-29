@@ -5,7 +5,9 @@ from pathlib import Path
 
 import cv2
 
+from src.behavior_analyzer.decision_engine import DecisionEngine
 from src.config import CONFIG, PROJECT_ROOT
+from src.dashboard import Dashboard
 from src.face_detector import FaceDetector
 from src.head_pose import HeadPoseEstimator
 from src.phone_detector import PhoneDetector, expanded_intersection, bbox_iou
@@ -188,9 +190,18 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
         min_detection_confidence=CONFIG.get("video_face_min_detection_confidence", 0.5),
         min_tracking_confidence=CONFIG.get("video_face_min_tracking_confidence", 0.5),
     )
-    face_tracker = CentroidTracker(max_distance=max(width, height) * 0.08, max_missed=int(fps * 2))
-    person_tracker = CentroidTracker(max_distance=max(width, height) * 0.12, max_missed=int(fps * 2))
+    keep_frames = int(fps * CONFIG.get("video_track_keep_seconds", 8.0))
+    face_tracker = CentroidTracker(
+        max_distance=max(width, height) * CONFIG.get("video_face_tracker_max_distance_ratio", 0.16),
+        max_missed=keep_frames,
+    )
+    person_tracker = CentroidTracker(
+        max_distance=max(width, height) * CONFIG.get("video_person_tracker_max_distance_ratio", 0.25),
+        max_missed=keep_frames,
+    )
     head_pose = HeadPoseEstimator()
+    dashboard = Dashboard()
+    decision_engine = DecisionEngine()
     pitch_threshold = CONFIG["pitch_down_threshold"] if CONFIG.get("video_use_pitch_distraction", False) else -999.0
     classifier = StateClassifier(CONFIG.get("video_yaw_threshold", CONFIG["yaw_threshold"]), pitch_threshold)
     video_config = dict(CONFIG)
@@ -232,6 +243,55 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
     confirmed_phone_centers = []
     person_memory: dict[int, dict] = {}
     detail_rows = []
+    single_student_mode = CONFIG.get("video_single_student_mode", False)
+
+    def student_key_and_label(track_id):
+        if single_student_mode:
+            return 1, "Student_1"
+        return track_id, f"Student_{track_id}"
+
+    def make_dashboard_record(record=None):
+        base = {
+            "student_id": "Video",
+            "state": "ABSENT",
+            "ear": 0.0,
+            "mar": 0.0,
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "roll": 0.0,
+            "attention_score": 100.0,
+            "identity_status": "SKIPPED",
+            "face_similarity": 0.0,
+            "liveness_status": "NO_FACE",
+            "liveness_score": 0.0,
+            "fps": fps,
+        }
+        if record:
+            base.update(record)
+            base["student_id"] = record.get("student", base["student_id"])
+        return base
+
+    if single_student_mode:
+        students[1] = StudentState("Student_1", video_config)
+
+    def append_absent_record(student_key, label, timestamp, dt):
+        record = {
+            "timestamp": timestamp,
+            "student": label,
+            "state": "ABSENT",
+            "ear": 0.0,
+            "mar": 0.0,
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "roll": 0.0,
+            "attention_score": students[student_key].attention.display_score,
+            "phone_detected": False,
+        }
+        score, patterns = students[student_key].update(record, dt)
+        record["attention_score"] = score
+        record["patterns"] = "; ".join(patterns)
+        detail_rows.append(record.copy())
+        return record, patterns
 
     frame_idx = 0
     start = time.time()
@@ -263,6 +323,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
         active_phone_centers = []
         memory_visible_count = 0
         assigned_phone_indices = set()
+        dashboard_record = make_dashboard_record()
+        dashboard_alerts = []
+        seen_student_keys = set()
 
         use_yolo_backend = CONFIG.get("person_tracker_backend", "centroid") == "yolo"
         use_person_tracking = (
@@ -328,6 +391,8 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                         for assigned_bbox in assigned_bboxes
                     )
                     allow_new_track = (
+                        single_student_mode
+                        or
                         timestamp <= CONFIG.get("person_new_track_grace_seconds", 2.0)
                         or not students
                         or proposed_track_id in students
@@ -359,9 +424,10 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
             used_face_indices = set()
 
             for det_idx, track_id in assignments.items():
-                label = f"Student_{track_id}"
-                if track_id not in students:
-                    students[track_id] = StudentState(label, video_config)
+                student_key, label = student_key_and_label(track_id)
+                if student_key not in students:
+                    students[student_key] = StudentState(label, video_config)
+                seen_student_keys.add(student_key)
 
                 bbox = person_bboxes[det_idx]
                 face_idx = find_face_for_person(bbox, detection.faces, used_face_indices)
@@ -375,7 +441,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                         phone_started_at.pop(track_id, None)
                         phone_last_seen_at.pop(track_id, None)
 
-                phone_detected = (
+                phone_detected = raw_phone_detected or (
                     track_id in phone_started_at
                     and timestamp - phone_started_at[track_id] >= CONFIG.get("video_phone_duration", 0.0)
                     and timestamp - phone_last_seen_at.get(track_id, timestamp) <= CONFIG.get("video_phone_hold_seconds", 0.0)
@@ -386,9 +452,9 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                     landmarks = detection.landmarks_list[face_idx]
                     face_bbox = detection.faces[face_idx]
                     yaw, pitch, roll = head_pose.estimate(frame, landmarks)
-                    ear, sleeping = students[track_id].eye_monitor.check(landmarks, timestamp)
-                    mar, talking = students[track_id].mouth_monitor.check(landmarks, timestamp)
-                    students[track_id].check_liveness(timestamp, landmarks, ear, yaw, pitch)
+                    ear, sleeping = students[student_key].eye_monitor.check(landmarks, timestamp)
+                    mar, talking = students[student_key].mouth_monitor.check(landmarks, timestamp)
+                    students[student_key].check_liveness(timestamp, landmarks, ear, yaw, pitch, sleeping)
                     state = classifier.classify(True, yaw, pitch, sleeping, talking)
                     if state == "DISTRACTED":
                         distraction_started_at.setdefault(track_id, timestamp)
@@ -443,13 +509,15 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                     "yaw": yaw,
                     "pitch": pitch,
                     "roll": roll,
-                    "attention_score": students[track_id].attention.display_score,
+                    "attention_score": students[student_key].attention.display_score,
                     "phone_detected": phone_detected,
                 }
-                score, patterns = students[track_id].update(record, dt)
+                score, patterns = students[student_key].update(record, dt)
                 record["attention_score"] = score
                 record["patterns"] = "; ".join(patterns)
                 detail_rows.append(record.copy())
+                dashboard_record = make_dashboard_record(record)
+                _, dashboard_alerts = decision_engine.decide(dashboard_record, patterns)
 
                 x, y, w, h = bbox
                 # Use the post-update state (may have been overridden to SPOOFING)
@@ -473,9 +541,10 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                         del person_memory[track_id]
                         continue
 
-                    label = f"Student_{track_id}"
-                    if track_id not in students:
-                        students[track_id] = StudentState(label, video_config)
+                    student_key, label = student_key_and_label(track_id)
+                    if student_key not in students:
+                        students[student_key] = StudentState(label, video_config)
+                    seen_student_keys.add(student_key)
 
                     state = "BODY_ONLY"
                     record = {
@@ -487,13 +556,15 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                         "yaw": 0.0,
                         "pitch": 0.0,
                         "roll": 0.0,
-                        "attention_score": students[track_id].attention.display_score,
+                        "attention_score": students[student_key].attention.display_score,
                         "phone_detected": False,
                     }
-                    score, patterns = students[track_id].update(record, dt)
+                    score, patterns = students[student_key].update(record, dt)
                     record["attention_score"] = score
                     record["patterns"] = "; ".join(patterns)
                     detail_rows.append(record.copy())
+                    dashboard_record = make_dashboard_record(record)
+                    _, dashboard_alerts = decision_engine.decide(dashboard_record, patterns)
                     memory_visible_count += 1
 
                     x, y, w, h = memory["bbox"]
@@ -506,16 +577,17 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
             matched_track_ids = set(assignments.values())
 
             for det_idx, track_id in assignments.items():
-                label = f"Student_{track_id}"
-                if track_id not in students:
-                    students[track_id] = StudentState(label, video_config)
+                student_key, label = student_key_and_label(track_id)
+                if student_key not in students:
+                    students[student_key] = StudentState(label, video_config)
+                seen_student_keys.add(student_key)
 
                 landmarks = detection.landmarks_list[det_idx]
                 bbox = detection.faces[det_idx]
                 yaw, pitch, roll = head_pose.estimate(frame, landmarks)
-                ear, sleeping = students[track_id].eye_monitor.check(landmarks, timestamp)
-                mar, talking = students[track_id].mouth_monitor.check(landmarks, timestamp)
-                students[track_id].check_liveness(timestamp, landmarks, ear, yaw, pitch)
+                ear, sleeping = students[student_key].eye_monitor.check(landmarks, timestamp)
+                mar, talking = students[student_key].mouth_monitor.check(landmarks, timestamp)
+                students[student_key].check_liveness(timestamp, landmarks, ear, yaw, pitch, sleeping)
                 state = classifier.classify(True, yaw, pitch, sleeping, talking)
                 if state == "DISTRACTED":
                     distraction_started_at.setdefault(track_id, timestamp)
@@ -536,7 +608,7 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                         phone_started_at.pop(track_id, None)
                         phone_last_seen_at.pop(track_id, None)
 
-                phone_detected = (
+                phone_detected = raw_phone_detected or (
                     track_id in phone_started_at
                     and timestamp - phone_started_at[track_id] >= CONFIG.get("video_phone_duration", 0.0)
                     and timestamp - phone_last_seen_at.get(track_id, timestamp) <= CONFIG.get("video_phone_hold_seconds", 0.0)
@@ -567,13 +639,15 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
                     "yaw": yaw,
                     "pitch": pitch,
                     "roll": roll,
-                    "attention_score": students[track_id].attention.display_score,
+                    "attention_score": students[student_key].attention.display_score,
                     "phone_detected": phone_detected,
                 }
-                score, patterns = students[track_id].update(record, dt)
+                score, patterns = students[student_key].update(record, dt)
                 record["attention_score"] = score
                 record["patterns"] = "; ".join(patterns)
                 detail_rows.append(record.copy())
+                dashboard_record = make_dashboard_record(record)
+                _, dashboard_alerts = decision_engine.decide(dashboard_record, patterns)
 
                 x, y, w, h = bbox
                 # Use the post-update state (may have been overridden to SPOOFING)
@@ -594,30 +668,25 @@ def analyze_video(video_path: Path, show=False, output_dir=OUTPUT_DIR, labels_cs
             cv2.putText(frame, f"PHONE {phone.confidence:.2f}", (x, max(20, y - 6)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 0, 255), 2)
 
-        for track_id, track in list(tracks.items()):
-            if track_id in matched_track_ids or track_id not in students:
-                continue
-            label = students[track_id].student_label
-            record = {
-                "timestamp": timestamp,
-                "student": label,
-                "state": "ABSENT",
-                "ear": 0.0,
-                "mar": 0.0,
-                "yaw": 0.0,
-                "pitch": 0.0,
-                "roll": 0.0,
-                "attention_score": students[track_id].attention.display_score,
-                "phone_detected": False,
-            }
-            score, patterns = students[track_id].update(record, dt)
-            record["attention_score"] = score
-            record["patterns"] = "; ".join(patterns)
-            detail_rows.append(record.copy())
+        if single_student_mode:
+            student_key, label = 1, "Student_1"
+            if student_key not in seen_student_keys:
+                record, patterns = append_absent_record(student_key, label, timestamp, dt)
+                dashboard_record = make_dashboard_record(record)
+                _, dashboard_alerts = decision_engine.decide(dashboard_record, patterns)
+        else:
+            for track_id, track in list(tracks.items()):
+                student_key, label = student_key_and_label(track_id)
+                if track_id in matched_track_ids or student_key not in students:
+                    continue
+                record, patterns = append_absent_record(student_key, label, timestamp, dt)
+                dashboard_record = make_dashboard_record(record)
+                _, dashboard_alerts = decision_engine.decide(dashboard_record, patterns)
 
         visible_label = "Persons" if use_person_tracking else "Faces"
         cv2.putText(frame, f"Time: {timestamp:.1f}s | {visible_label}: {len(assignments) + memory_visible_count} | IDs: {len(students)} | Raw Phones: {len(phone_detections)} | Active Phone Users: {active_phone_users}",
                     (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 220, 255), 2)
+        dashboard.draw(frame, dashboard_record, dashboard_alerts)
         writer.write(frame)
         if show:
             cv2.imshow("Classroom Video Analysis", frame)

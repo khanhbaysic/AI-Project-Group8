@@ -73,21 +73,28 @@ def run():
         CONFIG.get("sleep_min_eye_threshold_factor", 0.9),
     )
     mouth_monitor = MouthMonitor(
-        CONFIG["mar_threshold"], CONFIG["talk_duration"],
-        talk_window=CONFIG.get("talk_window", 1.5),
-        talk_min_transitions=CONFIG.get("talk_min_transitions", 3),
-        talk_mar_variance_threshold=CONFIG.get("talk_mar_variance_threshold", 0.005),
+        CONFIG.get("webcam_mar_threshold", CONFIG["mar_threshold"]),
+        CONFIG.get("webcam_talk_duration", CONFIG["talk_duration"]),
+        talk_window=CONFIG.get("webcam_talk_window", CONFIG.get("talk_window", 1.5)),
+        talk_min_transitions=CONFIG.get("webcam_talk_min_transitions", CONFIG.get("talk_min_transitions", 3)),
+        talk_mar_variance_threshold=CONFIG.get(
+            "webcam_talk_mar_variance_threshold",
+            CONFIG.get("talk_mar_variance_threshold", 0.005),
+        ),
     )
-    state_classifier = StateClassifier(CONFIG["yaw_threshold"], CONFIG["pitch_down_threshold"])
+    state_classifier = StateClassifier(
+        CONFIG.get("webcam_yaw_threshold", CONFIG["yaw_threshold"]),
+        CONFIG.get("webcam_pitch_down_threshold", CONFIG["pitch_down_threshold"]),
+    )
     liveness_detector = LivenessDetector(
-        CONFIG["liveness_threshold"],
-        CONFIG["liveness_warmup_seconds"],
-        CONFIG["liveness_window_seconds"],
+        CONFIG.get("webcam_liveness_threshold", CONFIG["liveness_threshold"]),
+        CONFIG.get("webcam_liveness_warmup_seconds", CONFIG["liveness_warmup_seconds"]),
+        CONFIG.get("webcam_liveness_window_seconds", CONFIG["liveness_window_seconds"]),
         CONFIG["ear_threshold"],
-        CONFIG.get("liveness_spoof_confirm_seconds", 4.0),
+        CONFIG.get("webcam_liveness_spoof_confirm_seconds", CONFIG.get("liveness_spoof_confirm_seconds", 4.0)),
         CONFIG.get("liveness_require_blink", True),
         CONFIG.get("liveness_max_score_without_blink", 0.29),
-        CONFIG.get("liveness_no_blink_grace_seconds", 15.0),
+        CONFIG.get("webcam_liveness_no_blink_grace_seconds", CONFIG.get("liveness_no_blink_grace_seconds", 15.0)),
     )
     identity_verifier = IdentityVerifier(
          CONFIG["identity_detector_model"],
@@ -110,8 +117,16 @@ def run():
     dashboard = Dashboard()
     phone_detector = PhoneDetector(
         CONFIG.get("phone_model_path", "yolov8n.pt"),
-        CONFIG.get("phone_confidence", 0.35),
+        CONFIG.get("webcam_phone_confidence", CONFIG.get("phone_confidence", 0.35)),
         CONFIG.get("phone_detection_enabled", True),
+        phone_min_aspect_ratio=CONFIG.get(
+            "webcam_phone_min_aspect_ratio",
+            CONFIG.get("phone_min_aspect_ratio", 1.2),
+        ),
+        phone_max_aspect_ratio=CONFIG.get(
+            "webcam_phone_max_aspect_ratio",
+            CONFIG.get("phone_max_aspect_ratio", 4.8),
+        ),
     )
     if phone_detector.warning:
         print(f"[WARN] {phone_detector.warning}")
@@ -303,7 +318,7 @@ def run():
             # phone was detected by YOLO at any point in the last N seconds.
             # Much more robust than a continuous-timer that resets on every
             # missed frame when YOLO detection flickers.
-            _phone_window = CONFIG.get("phone_seen_window", 0.5)
+            _phone_window = CONFIG.get("webcam_phone_seen_window", CONFIG.get("phone_seen_window", 0.5))
             if phone_detections:
                 phone_last_seen = now
             if phone_last_seen is not None and (now - phone_last_seen) <= _phone_window:
@@ -316,7 +331,7 @@ def run():
             #   1. The attention score decreases at the SPOOFING rate (-8/s).
             #   2. The dashboard CURRENT STATE box shows "SPOOFING" (not "OK").
             #   3. The CSV row records state=SPOOFING for post-session analytics.
-            if liveness_status == "SPOOFING":
+            if liveness_status == "SPOOFING" and state not in {"SLEEPING", PHONE_USAGE}:
                 state = "SPOOFING"
 
             record.update({

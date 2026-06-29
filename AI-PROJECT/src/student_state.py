@@ -61,7 +61,7 @@ class StudentState:
         # When anti-spoofing fires, override the behavioral state so that
         # the `state` column in the details CSV reflects SPOOFING — this
         # makes it visible to the evaluation harness and the heatmap.
-        if self.last_liveness_status == SPOOFING:
+        if self.last_liveness_status == SPOOFING and record.get("state") not in {SLEEPING, PHONE_USAGE}:
             record["state"] = SPOOFING
         state = record["state"]
         _, display_score = self.attention.update(state, dt)
@@ -76,7 +76,7 @@ class StudentState:
         self.last_record = record.copy()
         return display_score, patterns
 
-    def check_liveness(self, now, landmarks, ear, yaw, pitch):
+    def check_liveness(self, now, landmarks, ear, yaw, pitch, sleeping=False):
         """Update this student's liveness detector from the current face and
         return the status ('CHECKING' / 'LIVE' / 'SPOOFING').
 
@@ -85,6 +85,16 @@ class StudentState:
         identity it can run for every tracked student in the video analyzer.
         """
         score, status = self.liveness_detector.update(now, landmarks, ear, yaw, pitch)
+        closed_eye_gate = max(
+            self.eye_monitor.ear_threshold,
+            getattr(self.liveness_detector, "ear_threshold", self.eye_monitor.ear_threshold),
+        )
+        if (
+            sleeping
+            or ear < closed_eye_gate
+            or getattr(self.eye_monitor, "last_sleep_ear", ear) < closed_eye_gate
+        ) and status == SPOOFING:
+            status = "CHECKING"
         self.last_liveness_score = score
         self.last_liveness_status = status
         return status
